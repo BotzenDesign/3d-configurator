@@ -1,0 +1,196 @@
+/* ============================================================================
+   3D Print Configurator - Shopify Theme Extension Styles
+   ============================================================================
+   Scoped styles that render inside the merchant's theme without conflicts.
+   Uses BEM + polar- prefix to avoid collisions with theme CSS.
+   ============================================================================ */
+
+/* ── Wrapper ──────────────────────────────────────────────────────────────── */
+.polar-configurator-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: var(--polar-min-height, 700px);
+  background: #0a0a0f;
+  border-radius: 12px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: #e4e4e7;
+  container-type: inline-size;
+}
+
+.polar-configurator--bordered {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 40px rgba(0, 188, 212, 0.05);
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.polar-configurator__header {
+  padding: 20px 24px 0;
+}
+
+.polar-configurator__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fafafa;
+  margin: 0;
+}
+
+/* ── Canvas Mount Point ───────────────────────────────────────────────────── */
+.polar-configurator__canvas {
+  width: 100%;
+  min-height: var(--polar-min-height, 700px);
+  position: relative;
+}
+
+/* ── Loading State ─────────────────────────────────────────────────────── */
+.polar-configurator__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--polar-min-height, 700px);
+  gap: 16px;
+}
+
+.polar-configurator__spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #00bcd4;
+  border-radius: 50%;
+  animation: polar-spin 0.8s linear infinite;
+}
+
+@keyframes polar-spin {
+  to { transform: rotate(360deg); }
+}
+
+.polar-configurator__loading-text {
+  font-size: 0.875rem;
+  color: #71717a;
+  margin: 0;
+  animation: polar-pulse 2s ease-in-out infinite;
+}
+
+@keyframes polar-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ── Noscript Fallback ────────────────────────────────────────────────────── */
+.polar-configurator__noscript {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  padding: 40px;
+  color: #a1a1aa;
+}
+
+.polar-configurator__noscript p {
+  margin: 4px 0;
+  font-size: 0.875rem;
+}
+
+/* ── Error State ──────────────────────────────────────────────────────────── */
+.polar-configurator__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  padding: 40px;
+  gap: 12px;
+}
+
+.polar-configurator__error-icon {
+  width: 48px;
+  height: 48px;
+  color: #ef4444;
+}
+
+.polar-configurator__error-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fafafa;
+  margin: 0;
+}
+
+.polar-configurator__error-message {
+  font-size: 0.875rem;
+  color: #71717a;
+  margin: 0;
+  max-width: 400px;
+}
+
+.polar-configurator__retry-btn {
+  margin-top: 8px;
+  padding: 8px 20px;
+  background: #00bcd4;
+  color: #0a0a0f;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.polar-configurator__retry-btn:hover {
+  opacity: 0.85;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@container (max-width: 768px) {
+  .polar-configurator-wrapper {
+    border-radius: 0;
+    min-height: auto;
+  }
+
+  .polar-configurator__canvas {
+    min-height: 500px;
+  }
+
+  .polar-configurator__loading {
+    min-height: 500px;
+  }
+}
+
+/* ── Color scheme: light ──────────────────────────────────────────────────── */
+.polar-configurator-wrapper[data-color-scheme="light"] {
+  background: #fafafa;
+  color: #18181b;
+}
+
+.polar-configurator-wrapper[data-color-scheme="light"] .polar-configurator__title {
+  color: #09090b;
+}
+
+.polar-configurator-wrapper[data-color-scheme="light"] .polar-configurator__loading-text {
+  color: #71717a;
+}
+
+.polar-configurator-wrapper[data-color-scheme="light"] .polar-configurator__spinner {
+  border-color: rgba(0, 0, 0, 0.1);
+  border-top-color: #00bcd4;
+}
+
+.polar-configurator-wrapper[data-color-scheme="light"].polar-configurator--bordered {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* ── Color scheme: auto (follows prefers-color-scheme) ────────────────────── */
+@media (prefers-color-scheme: light) {
+  .polar-configurator-wrapper[data-color-scheme="auto"] {
+    background: #fafafa;
+    color: #18181b;
+  }
+
+  .polar-configurator-wrapper[data-color-scheme="auto"] .polar-configurator__title {
+    color: #09090b;
+  }
+}

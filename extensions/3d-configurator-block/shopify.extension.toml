@@ -1,0 +1,10 @@
+api_version = "2024-10"
+
+[[extensions]]
+type = "theme"
+name = "3D Print Configurator"
+handle = "3d-configurator-block"
+
+  [[extensions.targeting]]
+  module = "./blocks/configurator.liquid"
+  target = "section"

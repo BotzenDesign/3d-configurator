@@ -1,0 +1,114 @@
+{% comment %}
+  ============================================================================
+  3D Print Configurator - Theme App Extension Block
+  ============================================================================
+  This Liquid block embeds the React-based 3D Print Configurator into any
+  Shopify theme. Merchants can add it to any page via the Shopify Theme Editor.
+  
+  The block creates a container, injects the configurator's JS/CSS bundles,
+  and handles session token forwarding for authenticated API calls.
+  ============================================================================
+{% endcomment %}
+
+{% schema %}
+{
+  "name": "3D Print Configurator",
+  "target": "section",
+  "stylesheet": "configurator.css",
+  "javascript": "configurator-loader.js",
+  "settings": [
+    {
+      "type": "text",
+      "id": "configurator_title",
+      "label": "Title",
+      "default": "Design Your 3D Print"
+    },
+    {
+      "type": "text",
+      "id": "api_base_url",
+      "label": "API Base URL",
+      "info": "The URL where your configurator backend is hosted (e.g. https://your-app.vercel.app)",
+      "default": ""
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "Minimum Height (px)",
+      "min": 500,
+      "max": 1200,
+      "step": 50,
+      "default": 700
+    },
+    {
+      "type": "checkbox",
+      "id": "show_border",
+      "label": "Show border",
+      "default": false
+    },
+    {
+      "type": "select",
+      "id": "color_scheme",
+      "label": "Color Scheme",
+      "options": [
+        { "value": "dark", "label": "Dark" },
+        { "value": "light", "label": "Light" },
+        { "value": "auto", "label": "Auto (match theme)" }
+      ],
+      "default": "dark"
+    },
+    {
+      "type": "header",
+      "content": "Advanced"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_analytics",
+      "label": "Enable configurator analytics events",
+      "default": true
+    }
+  ],
+  "presets": [
+    {
+      "name": "3D Print Configurator",
+      "category": "Custom"
+    }
+  ]
+}
+{% endschema %}
+
+<div
+  id="polar-3d-configurator"
+  class="polar-configurator-wrapper{% if block.settings.show_border %} polar-configurator--bordered{% endif %}"
+  style="--polar-min-height: {{ block.settings.min_height }}px;"
+  data-api-base="{{ block.settings.api_base_url | default: '' }}"
+  data-color-scheme="{{ block.settings.color_scheme }}"
+  data-shop-domain="{{ shop.permanent_domain }}"
+  data-customer-id="{{ customer.id | default: '' }}"
+  data-customer-email="{{ customer.email | default: '' }}"
+  data-enable-analytics="{{ block.settings.enable_analytics }}"
+  {{ block.shopify_attributes }}
+>
+  <!-- Header -->
+  {% if block.settings.configurator_title != blank %}
+    <div class="polar-configurator__header">
+      <h2 class="polar-configurator__title">{{ block.settings.configurator_title }}</h2>
+    </div>
+  {% endif %}
+
+  <!-- Configurator mount point -->
+  <div id="polar-3d-configurator-root" class="polar-configurator__canvas">
+    <!-- Loading state shown before React bundle loads -->
+    <div class="polar-configurator__loading" id="polar-configurator-loader">
+      <div class="polar-configurator__spinner"></div>
+      <p class="polar-configurator__loading-text">Loading 3D Configurator...</p>
+    </div>
+  </div>
+
+  <!-- Noscript fallback -->
+  <noscript>
+    <div class="polar-configurator__noscript">
+      <p>JavaScript is required to use the 3D Print Configurator.</p>
+      <p>Please enable JavaScript in your browser settings and refresh the page.</p>
+    </div>
+  </noscript>
+</div>

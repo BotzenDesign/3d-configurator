@@ -4,6 +4,8 @@ import {
   createConfiguredCheckout,
   isShopifyConfigured,
 } from "@/lib/shopifyClient";
+import FileUploadComponent from "./FileUploadComponent";
+import ErrorBoundary from "./ErrorBoundary";
 
 const MATERIALS = [
   { label: "Standard Material (PLA)", pricePerG: 0.12 },
@@ -50,25 +52,13 @@ export default function ConfigPanel({
   const [color, setColor] = useState(0);
   const [density, setDensity] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const weight = parseFloat(modelStats.weight) || 55;
   const densityMultiplier = parseFloat(DENSITIES[density].value) / 20;
   const priceEach = +(MATERIALS[material].pricePerG * weight * densityMultiplier + 15).toFixed(2);
   const total = +(priceEach * quantity).toFixed(2);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      const file = e.dataTransfer.files[0];
-      if (file && file.name.toLowerCase().endsWith(".stl")) onFileUpload(file);
-    },
-    [onFileUpload]
-  );
 
   const handleColorSelect = (idx: number) => {
     setColor(idx);
@@ -118,7 +108,7 @@ export default function ConfigPanel({
   };
 
   return (
-    <div className="w-[320px] min-w-[320px] h-full bg-panel-bg flex flex-col overflow-y-auto">
+    <div className="w-full md:w-[320px] md:min-w-[320px] h-full bg-panel-bg flex flex-col overflow-y-auto">
       {/* Price */}
       <div className="p-6 text-center">
         <div className="text-6xl font-bold tracking-tight" style={{ color: "white" }}>
@@ -130,32 +120,10 @@ export default function ConfigPanel({
       </div>
 
       {/* Upload */}
-      <div
-        className={`mx-4 mb-4 border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-          isDragging ? "border-accent bg-accent/10" : "border-border"
-        }`}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => fileRef.current?.click()}
-      >
-        <Upload className="mx-auto mb-2 text-muted-foreground" size={28} />
-        <p className="text-sm font-medium">Drag &amp; Drop</p>
-        <p className="text-xs text-muted-foreground">OR</p>
-        <button className="text-sm border border-border rounded px-4 py-1 mt-1 hover:bg-secondary transition-colors">
-          Browse File
-        </button>
-        <p className="text-xs text-muted-foreground mt-2">(Supported file types: .stl)</p>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".stl"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onFileUpload(file);
-          }}
-        />
+      <div className="mx-4 mb-4">
+        <ErrorBoundary>
+          <FileUploadComponent onFileAccepted={onFileUpload} />
+        </ErrorBoundary>
       </div>
 
       {/* Config selectors */}

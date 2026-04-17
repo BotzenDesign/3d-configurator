@@ -1,0 +1,130 @@
+{% comment %}
+  ============================================================================
+  3D Print Configurator — Shopify Section Template
+  ============================================================================
+  A standalone Liquid section for merchants who want to embed the configurator
+  without the Theme App Extension. Copy this into your theme's `sections/`
+  directory and reference it in a template with {% section 'shopify-embed' %}.
+  
+  For App Extension usage, use the block in `extensions/` instead.
+  ============================================================================
+{% endcomment %}
+
+{{ 'configurator-embed.css' | asset_url | stylesheet_tag }}
+
+<section
+  id="polar-3d-configurator-section"
+  class="polar-section"
+  data-section-id="{{ section.id }}"
+  data-section-type="polar-3d-configurator"
+>
+  <div class="page-width polar-section__container">
+    {% if section.settings.show_heading %}
+      <div class="polar-section__header">
+        <h2 class="polar-section__heading h1">
+          {{ section.settings.heading | escape }}
+        </h2>
+        {% if section.settings.subheading != blank %}
+          <p class="polar-section__subheading">
+            {{ section.settings.subheading | escape }}
+          </p>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div
+      id="polar-3d-configurator"
+      class="polar-configurator-wrapper"
+      style="--polar-min-height: {{ section.settings.min_height }}px;"
+      data-api-base="{{ section.settings.api_base_url | default: '' }}"
+      data-color-scheme="{{ section.settings.color_scheme }}"
+      data-shop-domain="{{ shop.permanent_domain }}"
+      data-customer-id="{{ customer.id | default: '' }}"
+      data-customer-email="{{ customer.email | default: '' }}"
+      data-enable-analytics="{{ section.settings.enable_analytics }}"
+    >
+      <div id="polar-3d-configurator-root" class="polar-configurator__canvas">
+        <div class="polar-configurator__loading" id="polar-configurator-loader">
+          <div class="polar-configurator__spinner"></div>
+          <p class="polar-configurator__loading-text">Loading 3D Configurator...</p>
+        </div>
+      </div>
+
+      <noscript>
+        <div class="polar-configurator__noscript">
+          <p>JavaScript is required to use the 3D Print Configurator.</p>
+          <p>Please enable JavaScript in your browser settings.</p>
+        </div>
+      </noscript>
+    </div>
+  </div>
+</section>
+
+{% comment %} Load the configurator bootstrap script {% endcomment %}
+<script src="{{ section.settings.api_base_url | append: '/configurator-loader.js' }}" defer></script>
+
+{% schema %}
+{
+  "name": "3D Print Configurator",
+  "tag": "section",
+  "class": "polar-configurator-section",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_heading",
+      "label": "Show heading",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Design Your Custom 3D Print"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Upload your model, choose materials, and get an instant quote."
+    },
+    {
+      "type": "text",
+      "id": "api_base_url",
+      "label": "API Base URL",
+      "info": "The URL where your configurator backend is hosted.",
+      "default": ""
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "Minimum Height (px)",
+      "min": 400,
+      "max": 1200,
+      "step": 50,
+      "default": 700
+    },
+    {
+      "type": "select",
+      "id": "color_scheme",
+      "label": "Color Scheme",
+      "options": [
+        { "value": "dark", "label": "Dark" },
+        { "value": "light", "label": "Light" },
+        { "value": "auto", "label": "Auto" }
+      ],
+      "default": "dark"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_analytics",
+      "label": "Enable analytics",
+      "default": true
+    }
+  ],
+  "presets": [
+    {
+      "name": "3D Print Configurator"
+    }
+  ]
+}
+{% endschema %}
