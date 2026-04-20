@@ -1,36 +1,41 @@
-import { useCallback, useRef, useState } from "react";
-import { Upload, Minus, Plus, ExternalLink, Loader2, AlertCircle } from "lucide-react";
-import {
-  createConfiguredCheckout,
-  isShopifyConfigured,
-} from "@/lib/shopifyClient";
+import { useState, useRef } from "react";
+import { Upload, Minus, Plus, ExternalLink, Loader2, AlertCircle, ShoppingCart } from "lucide-react";
+import { createCheckout } from "@/lib/shopifyClient";
+import { useQuote } from "@/hooks/useQuote";
+import PriceBreakdown from "./PriceBreakdown";
 import FileUploadComponent from "./FileUploadComponent";
 import ErrorBoundary from "./ErrorBoundary";
 
+// ── Material IDs must match server/services/materialEstimationEngine.ts ────────
 const MATERIALS = [
-  { label: "Standard Material (PLA)", pricePerG: 0.12 },
-  { label: "PETG", pricePerG: 0.15 },
-  { label: "ABS", pricePerG: 0.14 },
-  { label: "TPU (Flexible)", pricePerG: 0.25 },
-  { label: "Nylon", pricePerG: 0.30 },
+  { label: "PLA (Standard)",     id: "PLA"    },
+  { label: "PLA+ (Enhanced)",    id: "PLA+"   },
+  { label: "PETG",               id: "PETG"   },
+  { label: "ABS",                id: "ABS"    },
+  { label: "ASA (UV Resistant)", id: "ASA"    },
+  { label: "TPU (Flexible)",     id: "TPU"    },
+  { label: "Nylon (PA12)",       id: "NYLON"  },
+  { label: "Polycarbonate (PC)", id: "PC"     },
+  { label: "Wood-fill PLA",      id: "WOOD"   },
+  { label: "Carbon Fiber PLA",   id: "CARBON" },
 ];
 
 const COLORS = [
-  { label: "Any Color", hex: "#00bcd4" },
-  { label: "White", hex: "#ffffff" },
-  { label: "Black", hex: "#222222" },
-  { label: "Red", hex: "#e53935" },
-  { label: "Blue", hex: "#1e88e5" },
-  { label: "Green", hex: "#43a047" },
-  { label: "Yellow", hex: "#fdd835" },
-  { label: "Orange", hex: "#fb8c00" },
+  { label: "Any Color",  hex: "#00bcd4" },
+  { label: "White",      hex: "#ffffff" },
+  { label: "Black",      hex: "#222222" },
+  { label: "Red",        hex: "#e53935" },
+  { label: "Blue",       hex: "#1e88e5" },
+  { label: "Green",      hex: "#43a047" },
+  { label: "Yellow",     hex: "#fdd835" },
+  { label: "Orange",     hex: "#fb8c00" },
 ];
 
-const DENSITIES = [
-  { label: "Standard Density", value: "20%" },
-  { label: "Light", value: "10%" },
-  { label: "Dense", value: "40%" },
-  { label: "Solid", value: "100%" },
+const INFILL_OPTIONS = [
+  { label: "Light (10%)",    value: 10  },
+  { label: "Standard (20%)", value: 20  },
+  { label: "Dense (40%)",    value: 40  },
+  { label: "Solid (100%)",   value: 100 },
 ];
 
 interface ConfigPanelProps {
@@ -39,6 +44,8 @@ interface ConfigPanelProps {
   selectedColor: string;
   modelStats: { dimensions: string; volume: string; surface: string; weight: string };
   modelName?: string;
+  /** File object passed from parent (either uploaded or preset-fetched) */
+  uploadedFile?: File | null;
 }
 
 export default function ConfigPanel({
@@ -47,92 +54,129 @@ export default function ConfigPanel({
   selectedColor,
   modelStats,
   modelName = "bear.stl",
+  uploadedFile: externalFile = null,
 }: ConfigPanelProps) {
-  const [material, setMaterial] = useState(0);
-  const [color, setColor] = useState(0);
-  const [density, setDensity] = useState(0);
-  const [quantity, setQuantity] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [materialIdx, setMaterialIdx] = useState(0);
+  const [colorIdx,    setColorIdx]    = useState(0);
+  const [infillIdx,   setInfillIdx]   = useState(1); // default: Standard 20%
+  const [quantity,    setQuantity]    = useState(1);
+  // Own uploaded file (from drag-drop/browse). Merges with externalFile from parent.
+  const [ownUploadedFile, setOwnUploadedFile] = useState<File | null>(null);
+  const activeFile = ownUploadedFile ?? externalFile;
 
-  const weight = parseFloat(modelStats.weight) || 55;
-  const densityMultiplier = parseFloat(DENSITIES[density].value) / 20;
-  const priceEach = +(MATERIALS[material].pricePerG * weight * densityMultiplier + 15).toFixed(2);
-  const total = +(priceEach * quantity).toFixed(2);
+  // Cart state
+  const [isAddingToCart,  setIsAddingToCart]  = useState(false);
+  const [cartError,       setCartError]       = useState<string | null>(null);
+
+  // ── Real-time quote from /api/quote ────────────────────────────────────────
+  const { quote, isLoading: isQuoteLoading, error: quoteError } = useQuote({
+    file: activeFile,
+    material: MATERIALS[materialIdx].id,
+    infill: INFILL_OPTIONS[infillIdx].value,
+    quantity,
+    debounceMs: 700,
+  });
 
   const handleColorSelect = (idx: number) => {
-    setColor(idx);
+    setColorIdx(idx);
     onColorChange(COLORS[idx].hex);
   };
 
-  const handleContinueToStore = async () => {
-    setCheckoutError(null);
+  const handleFileAccepted = (file: File) => {
+    setOwnUploadedFile(file);
+    onFileUpload(file);
+    setCartError(null);
+  };
 
-    // ── Dev mode: Shopify not yet configured ──────────────────────
-    if (!isShopifyConfigured()) {
-      setCheckoutError(
-        "Shopify is not configured yet. Fill in VITE_SHOPIFY_DOMAIN, " +
-        "VITE_SHOPIFY_STOREFRONT_TOKEN, and VITE_SHOPIFY_PRODUCT_ID in your .env.local file."
-      );
+  // ── Add to Cart ─────────────────────────────────────────────────────────────
+  const handleAddToCart = async () => {
+    setCartError(null);
+
+
+
+    if (!activeFile && !quote) {
+      setCartError("Please upload a 3D file first to generate a quote.");
       return;
     }
 
-    setIsLoading(true);
+    setIsAddingToCart(true);
     try {
-      const checkoutUrl = await createConfiguredCheckout({
-        material: MATERIALS[material].label,
-        color: COLORS[color].label,
-        colorHex: COLORS[color].hex,
-        density: DENSITIES[density].value,
+      const result = await createCheckout({
+        title: `Custom 3D Print - ${modelName}`,
         quantity,
-        priceEach,
-        totalPrice: total,
-        modelName,
-        dimensions: modelStats.dimensions,
-        weight: modelStats.weight,
-        volume: modelStats.volume,
+        price: Math.round((quote?.totalUsd ?? 0) * 100),
+        properties: {
+          Material:      MATERIALS[materialIdx].label,
+          Color:         COLORS[colorIdx].label,
+          Infill:        `${INFILL_OPTIONS[infillIdx].value}%`,
+          Dimensions:    modelStats.dimensions,
+          Weight:        quote?.display.weight    ?? modelStats.weight,
+          "Print Time":  quote?.display.printTime ?? "N/A",
+          Volume:        modelStats.volume,
+          Printability:  quote ? `${quote.printabilityGrade} (${quote.printabilityScore}/100)` : "N/A",
+          _file_name:    modelName,
+        },
       });
 
-      // Redirect customer to Shopify checkout
-      window.location.href = checkoutUrl;
+      if (result.success && result.checkoutUrl) {
+        // Redirect the user immediately to the dynamic Draft Order checkout
+        window.location.href = result.checkoutUrl;
+      }
     } catch (err) {
-      console.error("Shopify checkout error:", err);
-      setCheckoutError(
-        err instanceof Error
-          ? err.message
-          : "Failed to create checkout. Please try again."
-      );
+      setCartError(err instanceof Error ? err.message : "Failed to generate checkout link.");
     } finally {
-      setIsLoading(false);
+      setIsAddingToCart(false);
     }
   };
 
   return (
     <div className="w-full md:w-[320px] md:min-w-[320px] h-full bg-panel-bg flex flex-col overflow-y-auto">
-      {/* Price */}
-      <div className="p-6 text-center">
-        <div className="text-6xl font-bold tracking-tight" style={{ color: "white" }}>
-          ${Math.floor(priceEach)}
-          <span className="text-3xl align-top">.{(priceEach % 1).toFixed(2).slice(2)}</span>
-          <span className="text-lg font-normal text-muted-foreground ml-1">/ea</span>
-        </div>
-        <div className="text-sm text-muted-foreground mt-1">${total.toFixed(2)} total</div>
+
+      {/* ── Live Price Display ─────────────────────────────────────────────── */}
+      <div className="p-5 text-center border-b border-border">
+        {quote && !isQuoteLoading ? (
+          <>
+            <div className="text-5xl font-black tracking-tight text-white">
+              {quote.display.perUnit}
+              <span className="text-lg font-normal text-muted-foreground ml-1">/ea</span>
+            </div>
+            {quantity > 1 && (
+              <div className="text-sm text-muted-foreground mt-1">{quote.display.total} total</div>
+            )}
+            {quote.discountPct > 0 && (
+              <div className="mt-1 inline-block text-xs font-semibold text-green-400
+                             bg-green-400/10 border border-green-400/20 px-2 py-0.5 rounded-full">
+                -{quote.discountPct}% qty discount
+              </div>
+            )}
+          </>
+        ) : isQuoteLoading ? (
+          <div className="flex items-center justify-center gap-2 text-muted-foreground h-14">
+            <Loader2 size={16} className="animate-spin" />
+            <span className="text-sm">Calculating…</span>
+          </div>
+        ) : (
+          <div className="text-4xl font-black text-white/20 h-14 flex items-center justify-center">
+            —
+          </div>
+        )}
       </div>
 
-      {/* Upload */}
-      <div className="mx-4 mb-4">
+      {/* ── Upload ─────────────────────────────────────────────────────────── */}
+      <div className="mx-4 my-4">
         <ErrorBoundary>
-          <FileUploadComponent onFileAccepted={onFileUpload} />
+          <FileUploadComponent onFileAccepted={handleFileAccepted} />
         </ErrorBoundary>
       </div>
 
-      {/* Config selectors */}
+      {/* ── Config selectors ────────────────────────────────────────────────── */}
       <div className="px-4 space-y-3 flex-1">
+
         {/* Material */}
         <div className="bg-secondary rounded-lg overflow-hidden">
           <select
-            value={material}
-            onChange={(e) => setMaterial(+e.target.value)}
+            value={materialIdx}
+            onChange={(e) => setMaterialIdx(+e.target.value)}
             className="w-full bg-transparent px-4 py-3 text-config-label text-sm font-medium appearance-none cursor-pointer outline-none"
           >
             {MATERIALS.map((m, i) => (
@@ -144,7 +188,7 @@ export default function ConfigPanel({
         {/* Color */}
         <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
           <select
-            value={color}
+            value={colorIdx}
             onChange={(e) => handleColorSelect(+e.target.value)}
             className="bg-transparent text-config-label text-sm font-medium appearance-none cursor-pointer outline-none flex-1"
           >
@@ -153,23 +197,23 @@ export default function ConfigPanel({
             ))}
           </select>
           <div
-            className="w-6 h-6 rounded-full border-2 border-border ml-2 flex-shrink-0"
-            style={{ backgroundColor: COLORS[color].hex }}
+            className="w-5 h-5 rounded-full border-2 border-border ml-2 flex-shrink-0"
+            style={{ backgroundColor: COLORS[colorIdx].hex }}
           />
         </div>
 
-        {/* Density */}
+        {/* Infill */}
         <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
           <select
-            value={density}
-            onChange={(e) => setDensity(+e.target.value)}
+            value={infillIdx}
+            onChange={(e) => setInfillIdx(+e.target.value)}
             className="bg-transparent text-config-label text-sm font-medium appearance-none cursor-pointer outline-none flex-1"
           >
-            {DENSITIES.map((d, i) => (
+            {INFILL_OPTIONS.map((d, i) => (
               <option key={i} value={i} className="bg-secondary text-foreground">{d.label}</option>
             ))}
           </select>
-          <span className="text-config-value text-sm">{DENSITIES[density].value}</span>
+          <span className="text-config-value text-sm">{INFILL_OPTIONS[infillIdx].value}%</span>
         </div>
 
         {/* Quantity */}
@@ -192,44 +236,43 @@ export default function ConfigPanel({
           </div>
         </div>
 
-        <button className="text-config-label text-sm underline hover:no-underline">Add Note</button>
+        {/* Price Breakdown panel */}
+        <PriceBreakdown
+          quote={quote}
+          isLoading={isQuoteLoading}
+          error={quoteError}
+          hasFile={!!activeFile}
+        />
       </div>
 
-      {/* Error message */}
-      {checkoutError && (
+      {/* ── Error ───────────────────────────────────────────────────────────── */}
+      {cartError && (
         <div className="mx-4 mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-2">
           <AlertCircle size={16} className="text-destructive mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-destructive leading-snug">{checkoutError}</p>
+          <p className="text-xs text-destructive leading-snug">{cartError}</p>
         </div>
       )}
 
-      {/* Continue button */}
-      <div className="p-4">
+      {/* ── Add to Cart button ──────────────────────────────────────────────── */}
+      <div className="p-4 pt-3">
         <button
-          id="shopify-checkout-btn"
-          onClick={handleContinueToStore}
-          disabled={isLoading}
-          className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          id="shopify-add-to-cart-btn"
+          onClick={handleAddToCart}
+          disabled={isAddingToCart}
+          className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold text-sm
+                     hover:opacity-90 transition-opacity flex items-center justify-center gap-2
+                     disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isLoading ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              Creating Checkout…
-            </>
+          {isAddingToCart ? (
+            <><Loader2 size={16} className="animate-spin" /> Generating Checkout...</>
           ) : (
-            <>
-              Continue to Store <ExternalLink size={16} />
-            </>
+            <><ShoppingCart size={16} /> Proceed to Checkout</>
           )}
         </button>
 
-        {/* Dev-mode hint when not configured */}
-        {!isShopifyConfigured() && (
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            ⚙️ Fill in <code className="text-xs">.env.local</code> to activate Shopify
-          </p>
-        )}
+
       </div>
+
     </div>
   );
 }

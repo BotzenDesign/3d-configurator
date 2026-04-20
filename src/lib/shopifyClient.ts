@@ -1,145 +1,80 @@
 /**
- * shopifyClient.ts
- * ─────────────────────────────────────────────────────────────────
- * Shopify Buy SDK integration for the 3D Configurator.
- *
- * HOW IT WORKS:
- *  1. Fetches the "3D Print Order" product variant from Shopify
- *  2. Creates a new Shopify checkout
- *  3. Adds the product with all configurator options as line item
- *     custom attributes (visible to you in Shopify Admin → Orders)
- *  4. Returns the checkout web URL to redirect the customer
- *
- * SETUP:
- *  Fill in the 3 values in .env.local before using this module.
- *  See implementation_plan.md for step-by-step instructions.
- * ─────────────────────────────────────────────────────────────────
+ * ============================================================================
+ * Shopify Checkout Client — Draft Orders API Integration
+ * ============================================================================
+ * Uses a backend proxy (/api/proxy/cart/checkout) to create secure Draft Orders
+ * via the Shopify Admin API. This allows us to set dynamic custom prices
+ * for 3D prints, bypassing the static pricing of standard Shopify variants.
+ * ============================================================================
  */
 
-import Client from "shopify-buy";
-
-// ─── Env Variables (set in .env.local) ───────────────────────────
-const SHOPIFY_DOMAIN = import.meta.env.VITE_SHOPIFY_DOMAIN as string;
-const SHOPIFY_STOREFRONT_TOKEN = import.meta.env
-  .VITE_SHOPIFY_STOREFRONT_TOKEN as string;
-const SHOPIFY_PRODUCT_ID = import.meta.env.VITE_SHOPIFY_PRODUCT_ID as string;
-
-// ─── Validate Config ─────────────────────────────────────────────
-function assertEnvConfigured() {
-  const missing: string[] = [];
-  if (!SHOPIFY_DOMAIN || SHOPIFY_DOMAIN === "yourstore.myshopify.com")
-    missing.push("VITE_SHOPIFY_DOMAIN");
-  if (
-    !SHOPIFY_STOREFRONT_TOKEN ||
-    SHOPIFY_STOREFRONT_TOKEN === "your_storefront_api_token_here"
-  )
-    missing.push("VITE_SHOPIFY_STOREFRONT_TOKEN");
-  if (!SHOPIFY_PRODUCT_ID || SHOPIFY_PRODUCT_ID === "your_product_id_here")
-    missing.push("VITE_SHOPIFY_PRODUCT_ID");
-
-  if (missing.length > 0) {
-    throw new Error(
-      `Shopify is not configured yet.\n` +
-        `Please fill in these values in your .env.local file:\n` +
-        missing.map((k) => `  → ${k}`).join("\n")
-    );
-  }
+export interface CheckoutLineItemProperties {
+  _file_name?: string;
+  _file_url?: string;
+  Material: string;
+  Color: string;
+  Infill: string;
+  Dimensions: string;
+  Weight: string;
+  'Print Time': string;
+  Volume: string;
+  Printability: string;
+  [key: string]: string | undefined;
 }
 
-// ─── Build Shopify Client ─────────────────────────────────────────
-function buildShopifyClient() {
-  assertEnvConfigured();
-  return Client.buildClient({
-    domain: SHOPIFY_DOMAIN,
-    storefrontAccessToken: SHOPIFY_STOREFRONT_TOKEN,
-  });
-}
-
-// ─── Types ────────────────────────────────────────────────────────
-export interface ConfiguratorOptions {
-  material: string;
-  color: string;
-  colorHex: string;
-  density: string;
+export interface CreateCheckoutInput {
+  title: string;
   quantity: number;
-  priceEach: number;
-  totalPrice: number;
-  modelName: string;
-  dimensions?: string;
-  weight?: string;
-  volume?: string;
+  price: number; // in cents
+  properties: CheckoutLineItemProperties;
 }
 
-// ─── Main Export ─────────────────────────────────────────────────
+export interface CheckoutResponse {
+  success: boolean;
+  checkoutUrl?: string;
+  error?: string;
+}
+
+// Client no longer handles domain resolution; server reads it securely.
+
 /**
- * Creates a Shopify checkout from configurator options.
- * @returns The Shopify checkout URL to redirect the customer to.
+ * Creates a dynamically priced checkout session via Draft Orders proxy.
  */
-export async function createConfiguredCheckout(
-  options: ConfiguratorOptions
-): Promise<string> {
-  assertEnvConfigured();
+export async function createCheckout(input: CreateCheckoutInput): Promise<CheckoutResponse> {
 
-  const client = buildShopifyClient();
-
-  // 1. Fetch the 3D Print product to get the variant ID
-  const product = await client.product.fetch(SHOPIFY_PRODUCT_ID);
-
-  if (!product || !product.variants?.edges?.length) {
-    throw new Error(
-      `Could not find the "3D Print Order" product in Shopify.\n` +
-        `Check that VITE_SHOPIFY_PRODUCT_ID is correct.`
-    );
+  // Clean properties — Shopify ignores properties with underscore prefix in
+  // standard cart UI, but we're using Draft Orders here so we can include it.
+  const cleanProperties: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input.properties)) {
+    if (value !== undefined) cleanProperties[key] = value;
   }
 
-  const variantId = product.variants.edges[0].node.id;
+  const payload = {
+    title: input.title,
+    quantity: input.quantity,
+    price: input.price,
+    properties: cleanProperties
+  };
 
-  // 2. Create a blank checkout
-  const checkout = await client.checkout.create();
+  const res = await fetch('/api/proxy/cart/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
 
-  // 3. Build custom attributes (visible in Shopify Admin → Orders)
-  const customAttributes = [
-    { key: "Material", value: options.material },
-    { key: "Color", value: options.color },
-    { key: "Color Hex", value: options.colorHex },
-    { key: "Infill Density", value: options.density },
-    { key: "Price Per Unit", value: `$${options.priceEach.toFixed(2)}` },
-    { key: "Total Price", value: `$${options.totalPrice.toFixed(2)}` },
-    { key: "Model File", value: options.modelName },
-    ...(options.dimensions
-      ? [{ key: "Dimensions", value: options.dimensions }]
-      : []),
-    ...(options.weight ? [{ key: "Weight", value: options.weight }] : []),
-    ...(options.volume ? [{ key: "Volume", value: options.volume }] : []),
-    {
-      key: "Configured At",
-      value: new Date().toLocaleString("en-US", { timeZone: "UTC" }) + " UTC",
-    },
-  ];
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(err.error || `Checkout proxy error ${res.status}`);
+  }
 
-  // 4. Add the product to checkout with all config attributes
-  const updatedCheckout = await client.checkout.addLineItems(checkout.id, [
-    {
-      variantId,
-      quantity: options.quantity,
-      customAttributes,
-    },
-  ]);
+  const data = await res.json() as { checkoutUrl?: string };
+  
+  if (!data.checkoutUrl) {
+    throw new Error('Failed to retrieve checkout URL from Shopify.');
+  }
 
-  return updatedCheckout.webUrl;
-}
-
-/**
- * Returns true if Shopify credentials are configured in .env.local.
- * Useful for showing a warning in dev mode.
- */
-export function isShopifyConfigured(): boolean {
-  return (
-    !!SHOPIFY_DOMAIN &&
-    SHOPIFY_DOMAIN !== "yourstore.myshopify.com" &&
-    !!SHOPIFY_STOREFRONT_TOKEN &&
-    SHOPIFY_STOREFRONT_TOKEN !== "your_storefront_api_token_here" &&
-    !!SHOPIFY_PRODUCT_ID &&
-    SHOPIFY_PRODUCT_ID !== "your_product_id_here"
-  );
+  return {
+    success: true,
+    checkoutUrl: data.checkoutUrl,
+  };
 }

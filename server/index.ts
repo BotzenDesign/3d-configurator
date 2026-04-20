@@ -23,6 +23,7 @@ import cors from 'cors';
 import path from 'path';
 import multer from 'multer';
 import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
@@ -30,6 +31,7 @@ import dotenv from 'dotenv';
 import { fileValidationService } from './services/fileValidationService';
 import { geometryAnalysisService } from './services/geometryAnalysisService';
 import { materialEstimationEngine, MATERIALS, type MaterialId } from './services/materialEstimationEngine';
+import { pricingService } from './services/pricingService';
 
 // Middleware
 import { verifyShopifyProxy, verifySessionToken } from './middleware/shopifyProxyAuth';
@@ -42,6 +44,7 @@ import {
 
 // Routes
 import proxyRouter from './routes/proxyRouter';
+import cartRouter from './routes/cartRouter';
 
 // ── Config ───────────────────────────────────────────────────────────────
 dotenv.config({ path: '.env.local' });
@@ -72,7 +75,10 @@ app.use(rateLimiter(100, 60_000));
 app.use(verifySessionToken);
 
 // ── Upload Configuration ─────────────────────────────────────────────────
-const uploadDirectory = path.join(__dirname, '../uploads');
+const uploadDirectory = process.env.VERCEL 
+  ? path.join(os.tmpdir(), 'uploads') 
+  : path.join(__dirname, '../uploads');
+
 if (!fs.existsSync(uploadDirectory)) {
   fs.mkdirSync(uploadDirectory, { recursive: true });
 }
@@ -202,9 +208,72 @@ app.post('/api/analyze', upload.single('file'), async (req, res) => {
   }
 });
 
+// ── Full Quote Endpoint ──────────────────────────────────────────────────────
+// Combines geometry analysis + material estimation + pricing in one call.
+app.post('/api/quote', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file uploaded.' });
+
+    const ext = file.originalname.toLowerCase().split('.').pop();
+    const fileType = ext === 'obj' ? 'OBJ' : 'STL';
+
+    const materialId: MaterialId = (req.body.material || 'PLA') as MaterialId;
+    const infillPct  = Math.max(5, Math.min(100, parseInt(req.body.infill || '20', 10)));
+    const layerHeight = parseFloat(req.body.layerHeight || '0.2');
+    const quantity   = Math.max(1, parseInt(req.body.quantity || '1', 10));
+
+    if (!MATERIALS[materialId]) {
+      return res.status(400).json({ error: `Unknown material: ${materialId}` });
+    }
+
+    const buffer = fs.readFileSync(file.path);
+
+    // 1. Geometry analysis
+    const geometry = await geometryAnalysisService.analyzeBuffer(buffer, fileType);
+
+    // 2. Material + weight estimation
+    const estimation = materialEstimationEngine.estimate({
+      volumeCm3: geometry.volumeCm3,
+      surfaceAreaCm2: geometry.surfaceAreaCm2,
+      boundingBox: geometry.boundingBox,
+      materialId,
+      infill: { percentage: infillPct, pattern: 'grid', shellCount: 3, topBottomLayers: 4 },
+      needsSupport: !geometry.quality.isManifold || MATERIALS[materialId].requiresSupport,
+      layerHeightMm: layerHeight,
+    });
+
+    // 3. Pricing
+    const quote = pricingService.quote(geometry, estimation, quantity);
+
+    fs.unlink(file.path, () => {});
+
+    return res.json({
+      success: true,
+      quote,
+      geometry,
+      estimation,
+      meta: {
+        fileName: file.originalname,
+        fileSize: file.size,
+        fileType,
+        quotedAt: new Date().toISOString(),
+      },
+    });
+  } catch (err: any) {
+    console.error('[Quote Error]', err);
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ success: false, error: err.message || 'Quote failed.' });
+  }
+});
+
 // ── Shopify App Proxy Routes ─────────────────────────────────────────────
 // Requests arriving via Shopify's App Proxy pass through HMAC verification
 app.use('/api/proxy', verifyShopifyProxy, sessionContext, proxyRouter);
+
+// ── Cart Proxy (standalone mode) ─────────────────────────────────────────
+// Forwards cart/add.js calls to Shopify storefront on behalf of the app
+app.use('/api/proxy/cart', cartRouter);
 
 // ── Static Assets (production only) ──────────────────────────────────────
 if (IS_PRODUCTION) {
@@ -248,10 +317,15 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 // ── Start Server ─────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n🚀 Polar 3D Configurator API`);
-  console.log(`   → http://localhost:${PORT}`);
-  console.log(`   → Environment: ${IS_PRODUCTION ? 'production' : 'development'}`);
-  console.log(`   → Health: http://localhost:${PORT}/api/health`);
-  console.log(`   → Proxy:  http://localhost:${PORT}/api/proxy/health\n`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 Polar 3D Configurator API`);
+    console.log(`   → http://localhost:${PORT}`);
+    console.log(`   → Environment: ${IS_PRODUCTION ? 'production' : 'development'}`);
+    console.log(`   → Health: http://localhost:${PORT}/api/health`);
+    console.log(`   → Proxy:  http://localhost:${PORT}/api/proxy/health\n`);
+  });
+}
+
+// Export the Express app for Vercel serverless environment
+export default app;

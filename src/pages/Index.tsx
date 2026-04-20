@@ -11,6 +11,13 @@ import { validate3DFile } from "@/utils/fileValidation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 
+// Preset model STL URLs (served from /public/models/)
+const PRESET_MODELS: Record<string, string> = {
+  bear:   '/models/bear.stl',
+  mug:    '/models/mug.stl',
+  helmet: '/models/helmet.stl',
+};
+
 const DEFAULT_STATS = {
   dimensions: "103mm x 54mm x 75mm",
   volume: "153cm³",
@@ -23,6 +30,7 @@ export default function Index() {
   const [modelName, setModelName] = useState("bear.stl");
   const [color, setColor] = useState("#00bcd4");
   const [uploadedGeometry, setUploadedGeometry] = useState<THREE.BufferGeometry | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [stats, setStats] = useState(DEFAULT_STATS);
   const [mobileTab, setMobileTab] = useState<"viewer" | "config">("viewer");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,6 +57,7 @@ export default function Index() {
 
         const fileStats = computeStats(geometry);
         setUploadedGeometry(geometry);
+        setUploadedFile(file);
         setStats(fileStats);
         setModelType("upload");
         setModelName(file.name);
@@ -63,12 +72,31 @@ export default function Index() {
     reader.readAsArrayBuffer(file);
   }, [isMobile]);
 
-  const handleModelSelect = useCallback((id: string) => {
+  // When a preset model is selected, fetch it as a File so the quote API fires
+  const handleModelSelect = useCallback(async (id: string) => {
     if (id === "upload") return;
     setModelType(id);
     setModelName(`${id}.stl`);
     setUploadedGeometry(null);
     setStats(DEFAULT_STATS);
+
+    // Try to fetch the preset STL and wire it into the quote engine
+    const url = PRESET_MODELS[id];
+    if (url) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const blob = await res.blob();
+          const file = new File([blob], `${id}.stl`, { type: 'application/octet-stream' });
+          setUploadedFile(file);
+        }
+      } catch {
+        // Preset file not available — quote panel stays in empty state
+        setUploadedFile(null);
+      }
+    } else {
+      setUploadedFile(null);
+    }
   }, []);
 
   // ── Mobile Layout ──────────────────────────────────────────────────────
@@ -125,6 +153,7 @@ export default function Index() {
                 selectedColor={color}
                 modelStats={stats}
                 modelName={modelName}
+                uploadedFile={uploadedFile}
               />
             </div>
           )}
@@ -162,6 +191,7 @@ export default function Index() {
           selectedColor={color}
           modelStats={stats}
           modelName={modelName}
+          uploadedFile={uploadedFile}
         />
         <div className="flex-1 relative">
           <ModelViewer
