@@ -117,8 +117,9 @@ function length(v: Vec3): number {
  * Extract vertex triplets from a binary STL Buffer.
  * Returns flat Float32Array: [v0x, v0y, v0z,  v1x, v1y, v1z,  v2x, v2y, v2z, ...]
  */
-function parseSTLVertices(buffer: Buffer): Float32Array {
-  const numTriangles = buffer.readUInt32LE(80);
+function parseSTLVertices(buffer: Uint8Array): Float32Array {
+  const dataView = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  const numTriangles = dataView.getUint32(80, true);
   const vertices = new Float32Array(numTriangles * 9);
 
   let offset = 84;
@@ -126,9 +127,9 @@ function parseSTLVertices(buffer: Buffer): Float32Array {
     offset += 12; // skip normal
     for (let j = 0; j < 3; j++) {
       const base = i * 9 + j * 3;
-      vertices[base]     = buffer.readFloatLE(offset);
-      vertices[base + 1] = buffer.readFloatLE(offset + 4);
-      vertices[base + 2] = buffer.readFloatLE(offset + 8);
+      vertices[base]     = dataView.getFloat32(offset, true);
+      vertices[base + 1] = dataView.getFloat32(offset + 4, true);
+      vertices[base + 2] = dataView.getFloat32(offset + 8, true);
       offset += 12;
     }
     offset += 2; // attribute byte count
@@ -431,7 +432,7 @@ export class GeometryAnalysisService {
    * Supports binary STL, ASCII STL, and OBJ formats.
    */
   async analyzeBuffer(
-    buffer: Buffer,
+    buffer: Uint8Array,
     fileType: 'STL' | 'OBJ'
   ): Promise<GeometryAnalysisResult> {
     const start = Date.now();
@@ -440,17 +441,19 @@ export class GeometryAnalysisService {
     let verts: Float32Array;
 
     if (fileType === 'STL') {
-      const headerStr = buffer.subarray(0, 6).toString('ascii').toLowerCase();
+      const headerStr = new TextDecoder('ascii').decode(buffer.subarray(0, 6)).toLowerCase();
+      const dataView = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+      
       const isBinary = !headerStr.startsWith('solid') ||
-        (buffer.length === 84 + buffer.readUInt32LE(80) * 50);
+        (buffer.length === 84 + dataView.getUint32(80, true) * 50);
 
       if (isBinary) {
         verts = parseSTLVertices(buffer);
       } else {
-        verts = parseSTLAsciiVertices(buffer.toString('ascii'));
+        verts = parseSTLAsciiVertices(new TextDecoder('ascii').decode(buffer));
       }
     } else {
-      verts = parseOBJVertices(buffer.toString('utf8'));
+      verts = parseOBJVertices(new TextDecoder('utf-8').decode(buffer));
     }
 
     if (verts.length < 9) {

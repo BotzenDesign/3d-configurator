@@ -31,41 +31,26 @@ export default function FileUploadComponent({ onFileAccepted, className = "" }: 
     const formData = new FormData();
     formData.append("file", file);
 
-    // Simulated progress tick while network requests
+    // Simulated progress tick for UX
     let simulatedProgress = 10;
     const interval = setInterval(() => {
-      if (simulatedProgress < 85) {
-        simulatedProgress += Math.random() * 10;
+      if (simulatedProgress < 90) {
+        simulatedProgress += Math.random() * 15;
         setUploadProgress(Math.floor(simulatedProgress));
       }
-    }, 200);
+    }, 100);
 
-    fetch("/api/validate", {
-      method: "POST",
-      body: formData,
-    })
-      .then(async (res) => {
-        clearInterval(interval);
-        
-        const data = await res.json();
-        
-        if (!res.ok || !data.isValid) {
-          throw new Error(data.message || data.errors?.[0] || "Validation failed on server.");
-        }
-
-        setUploadProgress(100);
-        setTimeout(() => {
-          setIsUploading(false);
-          setUploadProgress(0);
-          onFileAccepted(file);
-        }, 500);
-      })
-      .catch((err) => {
-        clearInterval(interval);
+    // Simulate a brief validation delay for UX before passing to quote hook
+    setTimeout(() => {
+      clearInterval(interval);
+      setUploadProgress(100);
+      
+      setTimeout(() => {
         setIsUploading(false);
         setUploadProgress(0);
-        setError(err.message);
-      });
+        onFileAccepted(file);
+      }, 300);
+    }, 600);
 
   }, [onFileAccepted]);
 

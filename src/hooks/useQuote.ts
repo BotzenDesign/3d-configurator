@@ -79,13 +79,24 @@ export function useQuote({
     try {
       const form = new FormData();
       form.append('file', file);
-      form.append('material', material);
-      form.append('infill', String(infill));
+      form.append('materialId', material);
+      form.append('infillPercentage', String(infill));
       form.append('quantity', String(quantity));
       form.append('layerHeight', String(layerHeight));
 
-      const res = await fetch('/api/quote', {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !anonKey) {
+        throw new Error('Supabase environment variables missing in .env.local');
+      }
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/quote`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${anonKey}`,
+          'apikey': anonKey
+        },
         body: form,
         signal: abortRef.current.signal,
       });

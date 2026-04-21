@@ -1,4 +1,4 @@
-import fs from "fs";
+
 
 export interface ValidationReport {
   isValid: boolean;
@@ -20,7 +20,7 @@ export class FileValidationService {
    * Validate uploaded 3D file for structure, safety, and metadata.
    */
   public async validateFile(
-    filePath: string,
+    fileBuffer: Uint8Array,
     originalName: string,
     fileSize: number
   ): Promise<ValidationReport> {
@@ -54,12 +54,10 @@ export class FileValidationService {
 
     // 2. Malware & Structure check via magic numbers/header parsing
     try {
-      const buffer = fs.readFileSync(filePath);
-
       if (report.metadata!.fileType === "STL") {
-        this.validateSTLStructure(buffer, report);
+        this.validateSTLStructure(fileBuffer, report);
       } else if (report.metadata!.fileType === "OBJ") {
-        this.validateOBJStructure(buffer, report);
+        this.validateOBJStructure(fileBuffer, report);
       }
     } catch (e: any) {
       report.isValid = false;
@@ -74,7 +72,7 @@ export class FileValidationService {
   /**
    * Validates STL file integrity and identifies whether it is ASCII or Binary.
    */
-  private validateSTLStructure(buffer: Buffer, report: ValidationReport) {
+  private validateSTLStructure(buffer: Uint8Array, report: ValidationReport) {
     if (buffer.length < 84) {
       report.isValid = false;
       report.errors.push("STL file is too small to be valid.");
@@ -83,24 +81,22 @@ export class FileValidationService {
 
     // Heuristics to check binary vs ascii
     // ASCII STLs usually start with 'solid '
-    const headerString = buffer.subarray(0, 6).toString("ascii").toLowerCase();
+    const headerString = new TextDecoder("ascii").decode(buffer.subarray(0, 6)).toLowerCase();
     const isAscii = headerString.startsWith("solid ");
 
     if (isAscii) {
       // Basic check for ASCII STL ending
-      const lastBytes = buffer
-        .subarray(Math.max(0, buffer.length - 200))
-        .toString("ascii")
-        .toLowerCase();
+      const lastBytesArray = buffer.subarray(Math.max(0, buffer.length - 200));
+      const lastBytes = new TextDecoder("ascii").decode(lastBytesArray).toLowerCase();
       if (!lastBytes.includes("endsolid")) {
         report.warnings.push(
           "ASCII STL might be truncated. Could not consistently find 'endsolid' near EOF."
         );
       }
-    } else {
       // Binary STL Check
       // Standard Binary STL has 80 bytes header, then 4 bytes integer (number of triangles)
-      const numTriangles = buffer.readUInt32LE(80);
+      const dataView = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+      const numTriangles = dataView.getUint32(80, true);
       const expectedSize = 84 + numTriangles * 50;
 
       if (buffer.length !== expectedSize) {
@@ -114,7 +110,7 @@ export class FileValidationService {
   /**
    * Validates OBJ files
    */
-  private validateOBJStructure(buffer: Buffer, report: ValidationReport) {
+  private validateOBJStructure(buffer: Uint8Array, report: ValidationReport) {
     // OBJ files are plain text.
     // Basic malware check: ensure file doesn't contain null bytes (which a raw text file shouldn't have)
     const MAX_PEEK = Math.min(1024, buffer.length);
@@ -129,7 +125,7 @@ export class FileValidationService {
     }
 
     // Basic heuristic: should have 'v ' (vertex) or '#' (comment)
-    const content = buffer.subarray(0, MAX_PEEK).toString("ascii");
+    const content = new TextDecoder("ascii").decode(buffer.subarray(0, MAX_PEEK));
     if (!content.includes("v ") && !content.includes("#")) {
       report.warnings.push(
         "OBJ file lacks standard vertex ('v ') or comment ('#') definitions in header."

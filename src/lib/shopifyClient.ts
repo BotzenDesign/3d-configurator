@@ -56,9 +56,20 @@ export async function createCheckout(input: CreateCheckoutInput): Promise<Checko
     properties: cleanProperties
   };
 
-  const res = await fetch('/api/proxy/cart/checkout', {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error('Supabase environment variables missing in .env.local');
+  }
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/checkout`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${anonKey}`,
+      'apikey': anonKey
+    },
     body: JSON.stringify(payload),
   });
 

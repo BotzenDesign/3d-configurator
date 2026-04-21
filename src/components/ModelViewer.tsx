@@ -395,7 +395,7 @@ export default function ModelViewer({ modelType, color, geometry }: ModelViewerP
 
             <AutoFitCamera key={cameraResetKey} boundingBox={modelBounds} />
             <PerformanceMonitor visible={showPerf} />
-            <SceneReady onReady={() => setSceneReady(true)} />
+            <SceneReady key={modelType + (geometry ? geometry.uuid : '')} onReady={() => setSceneReady(true)} />
 
             {/* Battery saver — throttle when idle */}
             <IdleThrottle enabled={device.lowPowerMode} />

@@ -14,8 +14,8 @@
  * ============================================================================
  */
 
-import type { GeometryAnalysisResult } from './geometryAnalysisService.js';
-import type { EstimationResult } from './materialEstimationEngine.js';
+import type { GeometryAnalysisResult } from './geometryAnalysisService.ts';
+import type { EstimationResult } from './materialEstimationEngine.ts';
 
 // ── Pricing Configuration ─────────────────────────────────────────────────────
 
