@@ -1203,13 +1203,13 @@ export class PricingService {
 
     // ── 2. Machine Time Cost ────────────────────────────────────────────────
     let machineCost = 0;
-    if (estimation.material.id !== \'RESIN\') {
+    if (estimation.material.id !== 'RESIN') {
       const printHours = estimation.estimatedPrintMinutes / 60;
       machineCost = printHours * config.machineHourlyRateUsd;
       lineItems.push({
-        label: \'Machine Time\',
+        label: 'Machine Time',
         amountUsd: machineCost,
-        note: \ @ \$\/hr\,
+        note: `${estimation.estimatedPrintTime} @ $${config.machineHourlyRateUsd}/hr`,
       });
     }
 
