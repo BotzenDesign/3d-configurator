@@ -18,6 +18,8 @@ const MATERIALS = [
   { label: "Polycarbonate (PC)", id: "PC"     },
   { label: "Wood-fill PLA",      id: "WOOD"   },
   { label: "Carbon Fiber PLA",   id: "CARBON" },
+  { label: "HIPS (Support)",     id: "HIPS"   },
+  { label: "Standard Resin (SLA)", id: "RESIN" },
 ];
 
 const COLORS = [

@@ -1012,12 +1012,21 @@ export class MaterialEstimationEngine {
     const materialCostUsd = totalWeightGrams * material.costPerGram;
 
     // 7. Print time estimate
-    // Based on: layers × (perimeter travel + infill travel) / print speed
-    const layerCount = size.z / layerHeightMm;
-    const printSpeedMms = Math.min(material.maxSpeedMms, 60);
-    const avgLayerTravelMm = Math.sqrt(size.x * size.y) * (1 + fillRatio * 2);
-    const printTimeSeconds = (layerCount * avgLayerTravelMm) / printSpeedMms;
-    const printTimeMinutes = Math.max(5, Math.round(printTimeSeconds / 60));
+    let printTimeMinutes = 0;
+    if (material.id === 'RESIN') {
+      // SLA time is strictly Z-height based. Assume 10 seconds per layer (cure + peel + lift)
+      // Standard SLA layer height: 0.05mm
+      const layerCount = size.z / 0.05; 
+      const printTimeSeconds = layerCount * 10;
+      printTimeMinutes = Math.max(5, Math.round(printTimeSeconds / 60));
+    } else {
+      // FDM time based on nozzle travel
+      const layerCount = size.z / layerHeightMm;
+      const printSpeedMms = Math.max(1, Math.min(material.maxSpeedMms, 60)); // avoid div by zero
+      const avgLayerTravelMm = Math.sqrt(size.x * size.y) * (1 + fillRatio * 2);
+      const printTimeSeconds = (layerCount * avgLayerTravelMm) / printSpeedMms;
+      printTimeMinutes = Math.max(5, Math.round(printTimeSeconds / 60));
+    }
 
     const estimatedPrintTime = formatPrintTime(printTimeMinutes);
 
@@ -1193,13 +1202,16 @@ export class PricingService {
     });
 
     // ── 2. Machine Time Cost ────────────────────────────────────────────────
-    const printHours = estimation.estimatedPrintMinutes / 60;
-    const machineCost = printHours * config.machineHourlyRateUsd;
-    lineItems.push({
-      label: 'Machine Time',
-      amountUsd: machineCost,
-      note: `${estimation.estimatedPrintTime} @ $${config.machineHourlyRateUsd}/hr`,
-    });
+    let machineCost = 0;
+    if (estimation.material.id !== \'RESIN\') {
+      const printHours = estimation.estimatedPrintMinutes / 60;
+      machineCost = printHours * config.machineHourlyRateUsd;
+      lineItems.push({
+        label: \'Machine Time\',
+        amountUsd: machineCost,
+        note: \ @ \$\/hr\,
+      });
+    }
 
     // ── 3. Setup Fee ────────────────────────────────────────────────────────
     lineItems.push({

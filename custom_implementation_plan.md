@@ -15,7 +15,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React/Next.js)                  │
+│                    Frontend (React/Vite)                    │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │ File Upload  │  │ 3D Viewer    │  │ Quote UI     │      │
 │  │ Component    │  │ (Three.js)   │  │ Component    │      │
@@ -24,22 +24,22 @@
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Backend API (Vercel Serverless)                 │
+│              Backend API (Supabase Edge Functions)          │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │              Core API Routes (/api)                  │  │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐    │  │
-│  │  │ File Parse │  │ Analysis   │  │ Pricing    │    │  │
-│  │  │ Endpoint   │  │ Endpoint   │  │ Endpoint   │    │  │
-│  │  └────────────┘  └────────────┘  └────────────┘    │  │
+│  │              Deno Serverless Endpoints               │  │
+│  │  ┌────────────┐                  ┌────────────┐      │  │
+│  │  │ quote      │                  │ checkout   │      │  │
+│  │  │ (Analysis & Pricing)          │ (Draft Ords)      │  │
+│  │  └────────────┘                  └────────────┘      │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    External Services                         │
-│  ┌──────────────┐  ┌──────────────┐                        │
-│  │ Shopify API  │  │ File Storage │                        │
-│  └──────────────┘  └──────────────┘                        │
+│                    External Services                        │
+│  ┌──────────────┐                                           │
+│  │ Shopify API  │                                           │
+│  └──────────────┘                                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -74,21 +74,18 @@
 
 ---
 
-#### Task 1.2: Vercel Serverless Validation API (Day 2)
+#### Task 1.2: Supabase Edge Validation & Quote API (Day 2)
 **Owner:** Fullstack Developer  
-**Antigravity Role:** Vercel serverless function creation and security pipeline
+**Antigravity Role:** Deno Edge function creation and security pipeline
 
 **Implementation Steps:**
-1. Setup Vercel serverless environment (`/api` directory)
-2. Server-side file type verification
+1. Setup Supabase Edge functions (`supabase/functions/quote`)
+2. In-memory Uint8Array file parsing (bypassing Vercel 4.5MB limits)
 3. File structure validation (valid STL/OBJ format)
-4. Malware scanning integration
-5. File metadata extraction
 
 **Deliverables:**
-- File validation API endpoint
+- Deno validation API endpoint
 - Format checker utilities
-- Security scanning pipeline
 - Validation error messages
 
 ---
@@ -365,10 +362,10 @@
 - State management (Zustand/Redux)
 
 ### Backend Skills
-- Vercel Serverless Functions
-- File upload handling via serverless memory streams
-- Shopify Admin API
-- Database (PostgreSQL/MongoDB) (use Supabase)
+- Supabase Edge Functions (Deno)
+- High-performance ArrayBuffer/Uint8Array parsing
+- Shopify Admin API integration
+- Secure cloud secrets management (Supabase Vault)
 
 ### 3D Processing Skills
 - STL/OBJ parsing libraries

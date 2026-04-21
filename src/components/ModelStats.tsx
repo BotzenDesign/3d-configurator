@@ -54,7 +54,7 @@ export default function ModelStats({ dimensions, volume, surface, weight, modelN
         <StatRow icon={Ruler} label="Dimensions" value={dimensions} color="#ef4444" />
         <StatRow icon={Box} label="Volume" value={volume} color="#3b82f6" />
         <StatRow icon={Layers} label="Surface" value={surface} color="#22c55e" />
-        <StatRow icon={Weight} label="Weight (PLA)" value={weight} color="#f59e0b" />
+        <StatRow icon={Weight} label="Est. Weight" value={weight} color="#f59e0b" />
       </div>
     </div>
   );
