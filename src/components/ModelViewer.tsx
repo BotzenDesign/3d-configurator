@@ -184,6 +184,12 @@ function UploadedModel({
   const processedGeo = useMemo(() => {
     let g = geometry.clone();
 
+    // ── Z-up → Y-up correction ───────────────────────────────────────────
+    // Most CAD tools & slicers (Fusion 360, SolidWorks, PrusaSlicer, Bambu)
+    // export STL with Z as the "up" axis. Three.js uses Y-up, so without
+    // this rotation every imported model renders lying on its side.
+    g.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+
     // Apply LOD simplification if needed
     const posAttr = g.getAttribute("position");
     const currentTriangles = posAttr.count / 3;

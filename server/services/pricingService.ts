@@ -128,13 +128,16 @@ export class PricingService {
     });
 
     // ── 2. Machine Time Cost ────────────────────────────────────────────────
-    const printHours = estimation.estimatedPrintMinutes / 60;
-    const machineCost = printHours * config.machineHourlyRateUsd;
-    lineItems.push({
-      label: 'Machine Time',
-      amountUsd: machineCost,
-      note: `${estimation.estimatedPrintTime} @ $${config.machineHourlyRateUsd}/hr`,
-    });
+    let machineCost = 0;
+    if (!estimation.material.isResin) {
+      const printHours = estimation.estimatedPrintMinutes / 60;
+      machineCost = printHours * config.machineHourlyRateUsd;
+      lineItems.push({
+        label: 'Machine Time',
+        amountUsd: machineCost,
+        note: `${estimation.estimatedPrintTime} @ $${config.machineHourlyRateUsd}/hr`,
+      });
+    }
 
     // ── 3. Setup Fee ────────────────────────────────────────────────────────
     lineItems.push({

@@ -670,23 +670,39 @@ export const geometryAnalysisService = new GeometryAnalysisService();
  */
 
 // ── Material Database ────────────────────────────────────────────────────────
+// Source: "Material Cost color.pdf"
+// costPerGram = spool price ÷ spool weight
 
 export type MaterialId =
-  | 'PLA' | 'PLA+' | 'PETG' | 'ABS' | 'ASA' | 'TPU'
-  | 'NYLON' | 'PC' | 'HIPS' | 'WOOD' | 'CARBON' | 'RESIN';
+  // FDM Filament Spool — Build volume 330L × 240W × 300H mm
+  | 'PLA_BUDGET'    // $20 / 1000g = $0.020/g
+  | 'PLA'           // $35 / 1000g = $0.035/g
+  | 'ABS'           // $40 / 1000g = $0.040/g
+  | 'TPU95A'        // $40 / 1000g = $0.040/g
+  | 'TPU60D'        // $40 / 1000g = $0.040/g
+  | 'PETG'          // $50 / 1000g = $0.050/g
+  | 'UM_TOUGH_PLA'  // $55 /  750g = $0.073/g
+  | 'UM_ABS'        // $55 /  750g = $0.073/g
+  | 'UM_TPU'        // $55 /  750g = $0.073/g
+  // SLA Resin — Build volume 200L × 125W × 210H mm
+  | 'RESIN_CLEAR'   // $87  / 1000ml (~1.1g/ml) = $0.087/g
+  | 'RESIN_TOUGH'   // $155 / 1000ml             = $0.155/g
+  | 'RESIN_WHITE'   // $89  / 1000ml             = $0.089/g
+  | 'RESIN_BLACK'   // $89  / 1000ml             = $0.089/g
+  | 'RESIN_CLEAR_BLUE'; // $20 / 1000ml          = $0.020/g
 
 export interface Material {
   id: MaterialId;
   name: string;
   /** Density in g/cm³ */
   densityGcm3: number;
-  /** Approximate cost per gram in USD */
+  /** Cost per gram in USD — sourced directly from PDF spool price */
   costPerGram: number;
-  /** Typical nozzle temperature °C */
+  /** Typical nozzle temperature °C (0 for resin = UV cure) */
   nozzleTemp: number;
   /** Typical bed temperature °C */
   bedTemp: number;
-  /** Max recommended print speed mm/s */
+  /** Max recommended print speed mm/s (0 for resin) */
   maxSpeedMms: number;
   /** Layer adhesion quality (1-5) */
   layerAdhesion: number;
@@ -694,178 +710,242 @@ export interface Material {
   flexibility: number;
   /** Whether support material is often needed */
   requiresSupport: boolean;
+  /** Is this an SLA resin (true) or FDM filament (false) */
+  isResin: boolean;
   description: string;
+  /** Available colors from the PDF */
+  availableColors: string[];
   color: string; // UI accent color
 }
 
 export const MATERIALS: Record<MaterialId, Material> = {
+
+  // ── FDM Filament Spool ────────────────────────────────────────────────────
+  PLA_BUDGET: {
+    id: 'PLA_BUDGET',
+    name: 'PLA Budget',
+    densityGcm3: 1.24,
+    costPerGram: 0.020,           // $20 / 1000g
+    nozzleTemp: 210,
+    bedTemp: 60,
+    maxSpeedMms: 80,
+    layerAdhesion: 3,
+    flexibility: 1,
+    requiresSupport: false,
+    isResin: false,
+    description: 'Budget-friendly PLA. Best for basic prototypes and low-detail prints.',
+    availableColors: ['Red'],
+    color: '#ef4444',
+  },
   PLA: {
     id: 'PLA',
-    name: 'PLA (Standard)',
+    name: 'PLA Standard',
     densityGcm3: 1.24,
-    costPerGram: 0.018,
+    costPerGram: 0.035,           // $35 / 1000g
     nozzleTemp: 210,
     bedTemp: 60,
     maxSpeedMms: 80,
     layerAdhesion: 4,
     flexibility: 1,
     requiresSupport: false,
-    description: 'Best for beginners. Easy to print, biodegradable.',
+    isResin: false,
+    description: 'Easiest to print, biodegradable, wide color range.',
+    availableColors: ['Green', 'Red', 'Blue', 'Orange', 'Gray', 'Silver'],
     color: '#22c55e',
-  },
-  'PLA+': {
-    id: 'PLA+',
-    name: 'PLA+ (Enhanced)',
-    densityGcm3: 1.24,
-    costPerGram: 0.022,
-    nozzleTemp: 220,
-    bedTemp: 60,
-    maxSpeedMms: 80,
-    layerAdhesion: 5,
-    flexibility: 2,
-    requiresSupport: false,
-    description: 'Stronger and tougher than standard PLA.',
-    color: '#86efac',
-  },
-  PETG: {
-    id: 'PETG',
-    name: 'PETG',
-    densityGcm3: 1.27,
-    costPerGram: 0.025,
-    nozzleTemp: 240,
-    bedTemp: 80,
-    maxSpeedMms: 60,
-    layerAdhesion: 4,
-    flexibility: 2,
-    requiresSupport: false,
-    description: 'Food-safe, chemical resistant, flexible strength.',
-    color: '#3b82f6',
   },
   ABS: {
     id: 'ABS',
     name: 'ABS',
     densityGcm3: 1.04,
-    costPerGram: 0.020,
+    costPerGram: 0.040,           // $40 / 1000g
     nozzleTemp: 240,
     bedTemp: 110,
     maxSpeedMms: 60,
     layerAdhesion: 3,
     flexibility: 2,
     requiresSupport: true,
-    description: 'Heat resistant up to 100°C. Requires enclosure.',
+    isResin: false,
+    description: 'Heat resistant up to 100°C. Requires enclosure. Machinable.',
+    availableColors: ['Black', 'White'],
     color: '#f59e0b',
   },
-  ASA: {
-    id: 'ASA',
-    name: 'ASA (UV Resistant)',
-    densityGcm3: 1.07,
-    costPerGram: 0.030,
-    nozzleTemp: 250,
-    bedTemp: 100,
-    maxSpeedMms: 50,
-    layerAdhesion: 3,
-    flexibility: 2,
-    requiresSupport: true,
-    description: 'Outdoor use, UV and weather resistant.',
-    color: '#fb923c',
-  },
-  TPU: {
-    id: 'TPU',
-    name: 'TPU (Flexible)',
+  TPU95A: {
+    id: 'TPU95A',
+    name: 'TPU 95A (Flexible)',
     densityGcm3: 1.21,
-    costPerGram: 0.040,
+    costPerGram: 0.040,           // $40 / 1000g
     nozzleTemp: 230,
     bedTemp: 45,
     maxSpeedMms: 25,
     layerAdhesion: 4,
-    flexibility: 5,
+    flexibility: 4,
     requiresSupport: false,
-    description: 'Rubber-like, flexible, shock-absorbing.',
+    isResin: false,
+    description: 'Semi-flexible, rubber-like. Shore hardness 95A.',
+    availableColors: ['Red'],
     color: '#a855f7',
   },
-  NYLON: {
-    id: 'NYLON',
-    name: 'Nylon (PA12)',
-    densityGcm3: 1.01,
-    costPerGram: 0.045,
-    nozzleTemp: 260,
-    bedTemp: 70,
-    maxSpeedMms: 40,
-    layerAdhesion: 5,
-    flexibility: 3,
-    requiresSupport: true,
-    description: 'Extremely durable, low friction, chemical resistant.',
-    color: '#06b6d4',
+  TPU60D: {
+    id: 'TPU60D',
+    name: 'TPU 60D (Soft)',
+    densityGcm3: 1.21,
+    costPerGram: 0.040,           // $40 / 1000g
+    nozzleTemp: 225,
+    bedTemp: 45,
+    maxSpeedMms: 20,
+    layerAdhesion: 4,
+    flexibility: 5,
+    requiresSupport: false,
+    isResin: false,
+    description: 'Very soft and elastic. Shore hardness 60D. Excellent shock absorption.',
+    availableColors: ['White'],
+    color: '#c084fc',
   },
-  PC: {
-    id: 'PC',
-    name: 'Polycarbonate (PC)',
-    densityGcm3: 1.20,
-    costPerGram: 0.055,
-    nozzleTemp: 280,
-    bedTemp: 120,
-    maxSpeedMms: 40,
-    layerAdhesion: 5,
-    flexibility: 1,
-    requiresSupport: true,
-    description: 'Highest strength thermoplastic. Heat resistant to 130°C.',
-    color: '#64748b',
-  },
-  HIPS: {
-    id: 'HIPS',
-    name: 'HIPS (Support)',
-    densityGcm3: 1.03,
-    costPerGram: 0.022,
-    nozzleTemp: 230,
-    bedTemp: 100,
+  PETG: {
+    id: 'PETG',
+    name: 'PETG',
+    densityGcm3: 1.27,
+    costPerGram: 0.050,           // $50 / 1000g
+    nozzleTemp: 240,
+    bedTemp: 80,
     maxSpeedMms: 60,
-    layerAdhesion: 3,
+    layerAdhesion: 4,
     flexibility: 2,
     requiresSupport: false,
-    description: 'Dissolvable in D-Limonene. Used as support material for ABS.',
-    color: '#94a3b8',
+    isResin: false,
+    description: 'Food-safe, chemical resistant, strong inter-layer bonding.',
+    availableColors: ['Green', 'Purple', 'Blue'],
+    color: '#3b82f6',
   },
-  WOOD: {
-    id: 'WOOD',
-    name: 'Wood-fill PLA',
-    densityGcm3: 1.28,
-    costPerGram: 0.035,
-    nozzleTemp: 205,
-    bedTemp: 60,
-    maxSpeedMms: 40,
-    layerAdhesion: 3,
-    flexibility: 1,
-    requiresSupport: false,
-    description: 'Wood fiber composite. Sandable and stainable.',
-    color: '#92400e',
-  },
-  CARBON: {
-    id: 'CARBON',
-    name: 'Carbon Fiber PLA',
-    densityGcm3: 1.30,
-    costPerGram: 0.065,
+  UM_TOUGH_PLA: {
+    id: 'UM_TOUGH_PLA',
+    name: 'Ultimaker Tough PLA',
+    densityGcm3: 1.24,
+    costPerGram: 0.073,           // $55 / 750g
     nozzleTemp: 220,
     bedTemp: 60,
-    maxSpeedMms: 40,
-    layerAdhesion: 4,
-    flexibility: 1,
+    maxSpeedMms: 70,
+    layerAdhesion: 5,
+    flexibility: 2,
     requiresSupport: false,
-    description: 'Extremely stiff and lightweight. Hardened nozzle required.',
-    color: '#1c1917',
+    isResin: false,
+    description: 'Professional-grade PLA. Impact-resistant, high detail. Ultimaker certified.',
+    availableColors: ['Black', 'White', 'Grey', 'Yellow', 'Blue'],
+    color: '#0ea5e9',
   },
-  RESIN: {
-    id: 'RESIN',
-    name: 'Standard Resin (SLA)',
-    densityGcm3: 1.18,
-    costPerGram: 0.055,
-    nozzleTemp: 0, // UV cure, not FDM
+  UM_ABS: {
+    id: 'UM_ABS',
+    name: 'Ultimaker ABS',
+    densityGcm3: 1.04,
+    costPerGram: 0.073,           // $55 / 750g
+    nozzleTemp: 255,
+    bedTemp: 110,
+    maxSpeedMms: 50,
+    layerAdhesion: 5,
+    flexibility: 2,
+    requiresSupport: true,
+    isResin: false,
+    description: 'Professional ABS. Superior warp resistance. Ultimaker certified.',
+    availableColors: ['Black', 'White'],
+    color: '#f97316',
+  },
+  UM_TPU: {
+    id: 'UM_TPU',
+    name: 'Ultimaker TPU',
+    densityGcm3: 1.22,
+    costPerGram: 0.073,           // $55 / 750g
+    nozzleTemp: 230,
+    bedTemp: 70,
+    maxSpeedMms: 25,
+    layerAdhesion: 5,
+    flexibility: 4,
+    requiresSupport: false,
+    isResin: false,
+    description: 'Professional-grade flexible TPU. Ultimaker certified. Excellent surface quality.',
+    availableColors: ['Red', 'Blue', 'White'],
+    color: '#8b5cf6',
+  },
+
+  // ── SLA Liquid Photo Polymer Resin ──────────────────────────────────────
+  RESIN_CLEAR: {
+    id: 'RESIN_CLEAR',
+    name: 'Resin — Clear v5',
+    densityGcm3: 1.10,
+    costPerGram: 0.087,           // $87 / 1000ml
+    nozzleTemp: 0,
     bedTemp: 0,
     maxSpeedMms: 0,
     layerAdhesion: 5,
     flexibility: 1,
     requiresSupport: true,
-    description: 'SLA/MSLA resin printing. Extreme detail resolution.',
-    color: '#c084fc',
+    isResin: true,
+    description: 'Transparent SLA resin. Extreme surface detail. UV-cure only.',
+    availableColors: ['Clear'],
+    color: '#bae6fd',
+  },
+  RESIN_TOUGH: {
+    id: 'RESIN_TOUGH',
+    name: 'Resin — Tough 2000 ABS',
+    densityGcm3: 1.18,
+    costPerGram: 0.155,           // $155 / 1000ml
+    nozzleTemp: 0,
+    bedTemp: 0,
+    maxSpeedMms: 0,
+    layerAdhesion: 5,
+    flexibility: 2,
+    requiresSupport: true,
+    isResin: true,
+    description: 'ABS-like engineering resin. Impact resistant, semi-rigid. UV-cure only.',
+    availableColors: ['Grey'],
+    color: '#94a3b8',
+  },
+  RESIN_WHITE: {
+    id: 'RESIN_WHITE',
+    name: 'Resin — White',
+    densityGcm3: 1.10,
+    costPerGram: 0.089,           // $89 / 1000ml
+    nozzleTemp: 0,
+    bedTemp: 0,
+    maxSpeedMms: 0,
+    layerAdhesion: 5,
+    flexibility: 1,
+    requiresSupport: true,
+    isResin: true,
+    description: 'Opaque white SLA resin. High detail, smooth surface. UV-cure only.',
+    availableColors: ['White'],
+    color: '#f1f5f9',
+  },
+  RESIN_BLACK: {
+    id: 'RESIN_BLACK',
+    name: 'Resin — Black',
+    densityGcm3: 1.10,
+    costPerGram: 0.089,           // $89 / 1000ml
+    nozzleTemp: 0,
+    bedTemp: 0,
+    maxSpeedMms: 0,
+    layerAdhesion: 5,
+    flexibility: 1,
+    requiresSupport: true,
+    isResin: true,
+    description: 'Opaque black SLA resin. Excellent surface quality, UV-cure only.',
+    availableColors: ['Black'],
+    color: '#1e293b',
+  },
+  RESIN_CLEAR_BLUE: {
+    id: 'RESIN_CLEAR_BLUE',
+    name: 'Resin — ClearLight Blue ABS',
+    densityGcm3: 1.10,
+    costPerGram: 0.020,           // $20 / 1000ml
+    nozzleTemp: 0,
+    bedTemp: 0,
+    maxSpeedMms: 0,
+    layerAdhesion: 5,
+    flexibility: 1,
+    requiresSupport: true,
+    isResin: true,
+    description: 'Light blue clear SLA resin. UV-cure only.',
+    availableColors: ['Light Blue Clear'],
+    color: '#38bdf8',
   },
 };
 

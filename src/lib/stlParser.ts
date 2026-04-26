@@ -66,22 +66,35 @@ export function computeStats(geometry: THREE.BufferGeometry) {
   const size = new THREE.Vector3();
   box.getSize(size);
 
+  // Compute centroid to use as pivot — this prevents the signed-volume
+  // terms from cancelling when the mesh is far from the world origin
+  // (common with slicers that export models sideways or offset).
+  const pivot = new THREE.Vector3();
+  box.getCenter(pivot);
+
   const pos = geometry.getAttribute("position");
   let volume = 0;
   let surfaceArea = 0;
 
   for (let i = 0; i < pos.count; i += 3) {
-    const a = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
-    const b = new THREE.Vector3(pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1));
-    const c = new THREE.Vector3(pos.getX(i + 2), pos.getY(i + 2), pos.getZ(i + 2));
+    // Translate each vertex relative to the centroid pivot
+    const a = new THREE.Vector3(
+      pos.getX(i)     - pivot.x, pos.getY(i)     - pivot.y, pos.getZ(i)     - pivot.z
+    );
+    const b = new THREE.Vector3(
+      pos.getX(i + 1) - pivot.x, pos.getY(i + 1) - pivot.y, pos.getZ(i + 1) - pivot.z
+    );
+    const c = new THREE.Vector3(
+      pos.getX(i + 2) - pivot.x, pos.getY(i + 2) - pivot.y, pos.getZ(i + 2) - pivot.z
+    );
 
-    // Surface area
+    // Surface area (cross product magnitude / 2)
     const ab = new THREE.Vector3().subVectors(b, a);
     const ac = new THREE.Vector3().subVectors(c, a);
     surfaceArea += ab.cross(ac).length() / 2;
 
-    // Signed volume
-    volume += a.dot(b.clone().cross(c)) / 6;
+    // Signed tetrahedral volume relative to pivot
+    volume += a.dot(new THREE.Vector3().crossVectors(b, c)) / 6;
   }
 
   volume = Math.abs(volume);
@@ -90,8 +103,8 @@ export function computeStats(geometry: THREE.BufferGeometry) {
 
   return {
     dimensions: `${size.x.toFixed(0)}mm x ${size.y.toFixed(0)}mm x ${size.z.toFixed(0)}mm`,
-    volume: `${(volume / 1000).toFixed(0)}cm³`,
-    surface: `${(surfaceArea / 100).toFixed(0)}cm²`,
-    weight: `${weight.toFixed(0)}g`,
+    volume: `${(volume / 1000).toFixed(1)}cm³`,
+    surface: `${(surfaceArea / 100).toFixed(1)}cm²`,
+    weight: `${weight.toFixed(1)}g`,
   };
 }

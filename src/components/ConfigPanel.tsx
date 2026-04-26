@@ -6,31 +6,41 @@ import PriceBreakdown from "./PriceBreakdown";
 import FileUploadComponent from "./FileUploadComponent";
 import ErrorBoundary from "./ErrorBoundary";
 
-// ── Material IDs must match server/services/materialEstimationEngine.ts ────────
+// ── Materials: IDs must match SupabaseQuoteMonolith.ts MATERIALS record ───────
+// Source: "Material Cost color.pdf" — all costs derived from PDF spool prices
 const MATERIALS = [
-  { label: "PLA (Standard)",     id: "PLA"    },
-  { label: "PLA+ (Enhanced)",    id: "PLA+"   },
-  { label: "PETG",               id: "PETG"   },
-  { label: "ABS",                id: "ABS"    },
-  { label: "ASA (UV Resistant)", id: "ASA"    },
-  { label: "TPU (Flexible)",     id: "TPU"    },
-  { label: "Nylon (PA12)",       id: "NYLON"  },
-  { label: "Polycarbonate (PC)", id: "PC"     },
-  { label: "Wood-fill PLA",      id: "WOOD"   },
-  { label: "Carbon Fiber PLA",   id: "CARBON" },
-  { label: "HIPS (Support)",     id: "HIPS"   },
-  { label: "Standard Resin (SLA)", id: "RESIN" },
+  // ── Filament Spool (FDM) — Build volume: 330L × 240W × 300H mm ────────────
+  { label: "PLA Budget",           id: "PLA_BUDGET",    price: "$20/kg",  colors: ["Red"] },
+  { label: "PLA Standard",         id: "PLA",           price: "$35/kg",  colors: ["Green","Red","Blue","Orange","Gray","Silver"] },
+  { label: "ABS",                  id: "ABS",           price: "$40/kg",  colors: ["Black","White"] },
+  { label: "TPU 95A (Flexible)",   id: "TPU95A",        price: "$40/kg",  colors: ["Red"] },
+  { label: "TPU 60D (Soft)",       id: "TPU60D",        price: "$40/kg",  colors: ["White"] },
+  { label: "PETG",                 id: "PETG",          price: "$50/kg",  colors: ["Green","Purple","Blue"] },
+  { label: "Ultimaker Tough PLA",  id: "UM_TOUGH_PLA",  price: "$55/750g",colors: ["Black","White","Grey","Yellow","Blue"] },
+  { label: "Ultimaker ABS",        id: "UM_ABS",        price: "$55/750g",colors: ["Black","White"] },
+  { label: "Ultimaker TPU",        id: "UM_TPU",        price: "$55/750g",colors: ["Red","Blue","White"] },
+  // ── Liquid Photo Polymer Resin (SLA) — Build volume: 200L × 125W × 210H mm ─
+  { label: "Resin — Clear v5",     id: "RESIN_CLEAR",   price: "$87/L",   colors: ["Clear"] },
+  { label: "Resin — Tough ABS",    id: "RESIN_TOUGH",   price: "$155/L",  colors: ["Grey"] },
+  { label: "Resin — White",        id: "RESIN_WHITE",   price: "$89/L",   colors: ["White"] },
+  { label: "Resin — Black",        id: "RESIN_BLACK",   price: "$89/L",   colors: ["Black"] },
+  { label: "Resin — ClearLight Blue ABS", id: "RESIN_CLEAR_BLUE", price: "$20/L", colors: ["Light Blue Clear"] },
 ];
 
 const COLORS = [
   { label: "Any Color",  hex: "#00bcd4" },
   { label: "White",      hex: "#ffffff" },
   { label: "Black",      hex: "#222222" },
+  { label: "Grey",       hex: "#9e9e9e" },
+  { label: "Silver",     hex: "#e0e0e0" },
   { label: "Red",        hex: "#e53935" },
   { label: "Blue",       hex: "#1e88e5" },
+  { label: "Light Blue Clear", hex: "#81d4fa" },
   { label: "Green",      hex: "#43a047" },
   { label: "Yellow",     hex: "#fdd835" },
   { label: "Orange",     hex: "#fb8c00" },
+  { label: "Purple",     hex: "#8e24aa" },
+  { label: "Clear",      hex: "#e0f7fa" },
 ];
 
 const INFILL_OPTIONS = [
