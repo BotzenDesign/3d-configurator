@@ -132,12 +132,12 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="flex justify-between items-center bg-card p-4 rounded-xl shadow-sm border border-border">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
-            <p className="text-sm text-gray-500">Manage 3D Configurator Pricing & Materials</p>
+            <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Manage 3D Configurator Pricing & Materials</p>
           </div>
           <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
             <LogOut className="w-4 h-4" />
@@ -171,7 +171,7 @@ export default function AdminDashboard() {
               </Button>
             </div>
             
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -217,7 +217,7 @@ export default function AdminDashboard() {
                   ))}
                   {materials.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No materials found. Add one to get started.
                       </TableCell>
                     </TableRow>
@@ -228,15 +228,15 @@ export default function AdminDashboard() {
           </TabsContent>
           
           <TabsContent value="settings">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-              <h2 className="text-lg font-semibold mb-4">Global Pricing Configuration</h2>
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+              <h2 className="text-lg font-semibold mb-4 text-foreground">Global Pricing Configuration</h2>
               <div className="space-y-6 max-w-xl">
                 {settings.map((setting) => (
                   <div key={setting.key} className="space-y-2">
-                    <Label htmlFor={setting.key} className="font-medium capitalize">
+                    <Label htmlFor={setting.key} className="font-medium capitalize text-foreground">
                       {setting.key.replace(/_/g, ' ')}
                     </Label>
-                    <p className="text-sm text-gray-500 mb-2">{setting.description}</p>
+                    <p className="text-sm text-muted-foreground mb-2">{setting.description}</p>
                     <div className="flex gap-2">
                       <Input 
                         id={setting.key} 
@@ -255,7 +255,7 @@ export default function AdminDashboard() {
                   </div>
                 ))}
                 {settings.length === 0 && (
-                  <p className="text-gray-500">No settings found in the database.</p>
+                  <p className="text-muted-foreground">No settings found in the database.</p>
                 )}
               </div>
             </div>
