@@ -14,7 +14,7 @@ export interface ValidationReport {
 }
 
 export class FileValidationService {
-  private static MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+  private static MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
   private static ALLOWED_EXTENSIONS = [".stl", ".obj"];
 
   /**
@@ -673,23 +673,7 @@ export const geometryAnalysisService = new GeometryAnalysisService();
 // Source: "Material Cost color.pdf"
 // costPerGram = spool price ÷ spool weight
 
-export type MaterialId =
-  // FDM Filament Spool — Build volume 330L × 240W × 300H mm
-  | 'PLA_BUDGET'    // $20 / 1000g = $0.020/g
-  | 'PLA'           // $35 / 1000g = $0.035/g
-  | 'ABS'           // $40 / 1000g = $0.040/g
-  | 'TPU95A'        // $40 / 1000g = $0.040/g
-  | 'TPU60D'        // $40 / 1000g = $0.040/g
-  | 'PETG'          // $50 / 1000g = $0.050/g
-  | 'UM_TOUGH_PLA'  // $55 /  750g = $0.073/g
-  | 'UM_ABS'        // $55 /  750g = $0.073/g
-  | 'UM_TPU'        // $55 /  750g = $0.073/g
-  // SLA Resin — Build volume 200L × 125W × 210H mm
-  | 'RESIN_CLEAR'   // $87  / 1000ml (~1.1g/ml) = $0.087/g
-  | 'RESIN_TOUGH'   // $155 / 1000ml             = $0.155/g
-  | 'RESIN_WHITE'   // $89  / 1000ml             = $0.089/g
-  | 'RESIN_BLACK'   // $89  / 1000ml             = $0.089/g
-  | 'RESIN_CLEAR_BLUE'; // $20 / 1000ml          = $0.020/g
+export type MaterialId = string;
 
 export interface Material {
   id: MaterialId;
@@ -718,236 +702,7 @@ export interface Material {
   color: string; // UI accent color
 }
 
-export const MATERIALS: Record<MaterialId, Material> = {
-
-  // ── FDM Filament Spool ────────────────────────────────────────────────────
-  PLA_BUDGET: {
-    id: 'PLA_BUDGET',
-    name: 'PLA Budget',
-    densityGcm3: 1.24,
-    costPerGram: 0.020,           // $20 / 1000g
-    nozzleTemp: 210,
-    bedTemp: 60,
-    maxSpeedMms: 80,
-    layerAdhesion: 3,
-    flexibility: 1,
-    requiresSupport: false,
-    isResin: false,
-    description: 'Budget-friendly PLA. Best for basic prototypes and low-detail prints.',
-    availableColors: ['Red'],
-    color: '#ef4444',
-  },
-  PLA: {
-    id: 'PLA',
-    name: 'PLA Standard',
-    densityGcm3: 1.24,
-    costPerGram: 0.035,           // $35 / 1000g
-    nozzleTemp: 210,
-    bedTemp: 60,
-    maxSpeedMms: 80,
-    layerAdhesion: 4,
-    flexibility: 1,
-    requiresSupport: false,
-    isResin: false,
-    description: 'Easiest to print, biodegradable, wide color range.',
-    availableColors: ['Green', 'Red', 'Blue', 'Orange', 'Gray', 'Silver'],
-    color: '#22c55e',
-  },
-  ABS: {
-    id: 'ABS',
-    name: 'ABS',
-    densityGcm3: 1.04,
-    costPerGram: 0.040,           // $40 / 1000g
-    nozzleTemp: 240,
-    bedTemp: 110,
-    maxSpeedMms: 60,
-    layerAdhesion: 3,
-    flexibility: 2,
-    requiresSupport: true,
-    isResin: false,
-    description: 'Heat resistant up to 100°C. Requires enclosure. Machinable.',
-    availableColors: ['Black', 'White'],
-    color: '#f59e0b',
-  },
-  TPU95A: {
-    id: 'TPU95A',
-    name: 'TPU 95A (Flexible)',
-    densityGcm3: 1.21,
-    costPerGram: 0.040,           // $40 / 1000g
-    nozzleTemp: 230,
-    bedTemp: 45,
-    maxSpeedMms: 25,
-    layerAdhesion: 4,
-    flexibility: 4,
-    requiresSupport: false,
-    isResin: false,
-    description: 'Semi-flexible, rubber-like. Shore hardness 95A.',
-    availableColors: ['Red'],
-    color: '#a855f7',
-  },
-  TPU60D: {
-    id: 'TPU60D',
-    name: 'TPU 60D (Soft)',
-    densityGcm3: 1.21,
-    costPerGram: 0.040,           // $40 / 1000g
-    nozzleTemp: 225,
-    bedTemp: 45,
-    maxSpeedMms: 20,
-    layerAdhesion: 4,
-    flexibility: 5,
-    requiresSupport: false,
-    isResin: false,
-    description: 'Very soft and elastic. Shore hardness 60D. Excellent shock absorption.',
-    availableColors: ['White'],
-    color: '#c084fc',
-  },
-  PETG: {
-    id: 'PETG',
-    name: 'PETG',
-    densityGcm3: 1.27,
-    costPerGram: 0.050,           // $50 / 1000g
-    nozzleTemp: 240,
-    bedTemp: 80,
-    maxSpeedMms: 60,
-    layerAdhesion: 4,
-    flexibility: 2,
-    requiresSupport: false,
-    isResin: false,
-    description: 'Food-safe, chemical resistant, strong inter-layer bonding.',
-    availableColors: ['Green', 'Purple', 'Blue'],
-    color: '#3b82f6',
-  },
-  UM_TOUGH_PLA: {
-    id: 'UM_TOUGH_PLA',
-    name: 'Ultimaker Tough PLA',
-    densityGcm3: 1.24,
-    costPerGram: 0.073,           // $55 / 750g
-    nozzleTemp: 220,
-    bedTemp: 60,
-    maxSpeedMms: 70,
-    layerAdhesion: 5,
-    flexibility: 2,
-    requiresSupport: false,
-    isResin: false,
-    description: 'Professional-grade PLA. Impact-resistant, high detail. Ultimaker certified.',
-    availableColors: ['Black', 'White', 'Grey', 'Yellow', 'Blue'],
-    color: '#0ea5e9',
-  },
-  UM_ABS: {
-    id: 'UM_ABS',
-    name: 'Ultimaker ABS',
-    densityGcm3: 1.04,
-    costPerGram: 0.073,           // $55 / 750g
-    nozzleTemp: 255,
-    bedTemp: 110,
-    maxSpeedMms: 50,
-    layerAdhesion: 5,
-    flexibility: 2,
-    requiresSupport: true,
-    isResin: false,
-    description: 'Professional ABS. Superior warp resistance. Ultimaker certified.',
-    availableColors: ['Black', 'White'],
-    color: '#f97316',
-  },
-  UM_TPU: {
-    id: 'UM_TPU',
-    name: 'Ultimaker TPU',
-    densityGcm3: 1.22,
-    costPerGram: 0.073,           // $55 / 750g
-    nozzleTemp: 230,
-    bedTemp: 70,
-    maxSpeedMms: 25,
-    layerAdhesion: 5,
-    flexibility: 4,
-    requiresSupport: false,
-    isResin: false,
-    description: 'Professional-grade flexible TPU. Ultimaker certified. Excellent surface quality.',
-    availableColors: ['Red', 'Blue', 'White'],
-    color: '#8b5cf6',
-  },
-
-  // ── SLA Liquid Photo Polymer Resin ──────────────────────────────────────
-  RESIN_CLEAR: {
-    id: 'RESIN_CLEAR',
-    name: 'Resin — Clear v5',
-    densityGcm3: 1.10,
-    costPerGram: 0.087,           // $87 / 1000ml
-    nozzleTemp: 0,
-    bedTemp: 0,
-    maxSpeedMms: 0,
-    layerAdhesion: 5,
-    flexibility: 1,
-    requiresSupport: true,
-    isResin: true,
-    description: 'Transparent SLA resin. Extreme surface detail. UV-cure only.',
-    availableColors: ['Clear'],
-    color: '#bae6fd',
-  },
-  RESIN_TOUGH: {
-    id: 'RESIN_TOUGH',
-    name: 'Resin — Tough 2000 ABS',
-    densityGcm3: 1.18,
-    costPerGram: 0.155,           // $155 / 1000ml
-    nozzleTemp: 0,
-    bedTemp: 0,
-    maxSpeedMms: 0,
-    layerAdhesion: 5,
-    flexibility: 2,
-    requiresSupport: true,
-    isResin: true,
-    description: 'ABS-like engineering resin. Impact resistant, semi-rigid. UV-cure only.',
-    availableColors: ['Grey'],
-    color: '#94a3b8',
-  },
-  RESIN_WHITE: {
-    id: 'RESIN_WHITE',
-    name: 'Resin — White',
-    densityGcm3: 1.10,
-    costPerGram: 0.089,           // $89 / 1000ml
-    nozzleTemp: 0,
-    bedTemp: 0,
-    maxSpeedMms: 0,
-    layerAdhesion: 5,
-    flexibility: 1,
-    requiresSupport: true,
-    isResin: true,
-    description: 'Opaque white SLA resin. High detail, smooth surface. UV-cure only.',
-    availableColors: ['White'],
-    color: '#f1f5f9',
-  },
-  RESIN_BLACK: {
-    id: 'RESIN_BLACK',
-    name: 'Resin — Black',
-    densityGcm3: 1.10,
-    costPerGram: 0.089,           // $89 / 1000ml
-    nozzleTemp: 0,
-    bedTemp: 0,
-    maxSpeedMms: 0,
-    layerAdhesion: 5,
-    flexibility: 1,
-    requiresSupport: true,
-    isResin: true,
-    description: 'Opaque black SLA resin. Excellent surface quality, UV-cure only.',
-    availableColors: ['Black'],
-    color: '#1e293b',
-  },
-  RESIN_CLEAR_BLUE: {
-    id: 'RESIN_CLEAR_BLUE',
-    name: 'Resin — ClearLight Blue ABS',
-    densityGcm3: 1.10,
-    costPerGram: 0.020,           // $20 / 1000ml
-    nozzleTemp: 0,
-    bedTemp: 0,
-    maxSpeedMms: 0,
-    layerAdhesion: 5,
-    flexibility: 1,
-    requiresSupport: true,
-    isResin: true,
-    description: 'Light blue clear SLA resin. UV-cure only.',
-    availableColors: ['Light Blue Clear'],
-    color: '#38bdf8',
-  },
-};
+export let MATERIALS: Record<MaterialId, Material> = {}; // Will be populated from DB
 
 // ── Infill Profiles ───────────────────────────────────────────────────────────
 
@@ -1262,6 +1017,10 @@ export class PricingService {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
+  setConfig(config: Partial<PricingConfig>) {
+    this.config = { ...this.config, ...config };
+  }
+
   /**
    * Generate a full price quote from geometry analysis + material estimation.
    */
@@ -1408,6 +1167,12 @@ export const pricingService = new PricingService();
 
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Initialize Supabase Client
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 
 const corsHeaders = {
@@ -1423,6 +1188,49 @@ serve(async (req) => {
   }
 
   try {
+    // 1. Fetch live configuration from Database
+    const [{ data: dbMaterials }, { data: dbSettings }] = await Promise.all([
+      supabase.from("materials").select("*").eq("is_active", true),
+      supabase.from("app_settings").select("*")
+    ]);
+
+    // Reconstruct MATERIALS record
+    MATERIALS = (dbMaterials || []).reduce((acc: any, mat: any) => {
+      acc[mat.id] = {
+        id: mat.id,
+        name: mat.label,
+        densityGcm3: Number(mat.density_gcm3),
+        costPerGram: Number(mat.cost_per_gram),
+        nozzleTemp: mat.type === 'SLA' ? 0 : 210,
+        bedTemp: mat.type === 'SLA' ? 0 : 60,
+        maxSpeedMms: mat.type === 'SLA' ? 0 : 80,
+        layerAdhesion: 5,
+        flexibility: 2,
+        requiresSupport: mat.type === 'SLA',
+        isResin: mat.type === 'SLA',
+        description: mat.price_label,
+        availableColors: mat.colors || [],
+        color: '#00bcd4', // default
+      };
+      return acc;
+    }, {});
+
+    // Reconstruct pricing config
+    const settingsMap = (dbSettings || []).reduce((acc: any, s: any) => {
+      acc[s.key] = s.value;
+      return acc;
+    }, {});
+
+    pricingService.setConfig({
+      markupMultiplier: Number(settingsMap.markup_multiplier ?? 1.0),
+      setupFeeUsd: Number(settingsMap.base_setup_fee ?? 0.0),
+    });
+    
+    // Also update FileValidationService dynamic max file size if present
+    if (settingsMap.max_file_size_mb) {
+      (FileValidationService as any).MAX_FILE_SIZE = Number(settingsMap.max_file_size_mb) * 1024 * 1024;
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const materialId = (formData.get("materialId") as MaterialId) || "PLA";

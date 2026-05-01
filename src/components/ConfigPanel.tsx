@@ -1,48 +1,33 @@
-import { useState, useRef } from "react";
-import { Upload, Minus, Plus, ExternalLink, Loader2, AlertCircle, ShoppingCart } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Minus, Plus, Loader2, AlertCircle, ShoppingCart } from "lucide-react";
 import { createCheckout } from "@/lib/shopifyClient";
 import { useQuote } from "@/hooks/useQuote";
 import PriceBreakdown from "./PriceBreakdown";
 import FileUploadComponent from "./FileUploadComponent";
 import ErrorBoundary from "./ErrorBoundary";
+import { supabase } from "@/integrations/supabase/client";
 
-// ── Materials: IDs must match SupabaseQuoteMonolith.ts MATERIALS record ───────
-// Source: "Material Cost color.pdf" — all costs derived from PDF spool prices
-const MATERIALS = [
-  // ── Filament Spool (FDM) — Build volume: 330L × 240W × 300H mm ────────────
-  { label: "PLA Budget",           id: "PLA_BUDGET",    price: "$20/kg",  colors: ["Red"] },
-  { label: "PLA Standard",         id: "PLA",           price: "$35/kg",  colors: ["Green","Red","Blue","Orange","Gray","Silver"] },
-  { label: "ABS",                  id: "ABS",           price: "$40/kg",  colors: ["Black","White"] },
-  { label: "TPU 95A (Flexible)",   id: "TPU95A",        price: "$40/kg",  colors: ["Red"] },
-  { label: "TPU 60D (Soft)",       id: "TPU60D",        price: "$40/kg",  colors: ["White"] },
-  { label: "PETG",                 id: "PETG",          price: "$50/kg",  colors: ["Green","Purple","Blue"] },
-  { label: "Ultimaker Tough PLA",  id: "UM_TOUGH_PLA",  price: "$55/750g",colors: ["Black","White","Grey","Yellow","Blue"] },
-  { label: "Ultimaker ABS",        id: "UM_ABS",        price: "$55/750g",colors: ["Black","White"] },
-  { label: "Ultimaker TPU",        id: "UM_TPU",        price: "$55/750g",colors: ["Red","Blue","White"] },
-  // ── Liquid Photo Polymer Resin (SLA) — Build volume: 200L × 125W × 210H mm ─
-  { label: "Resin — Clear v5",     id: "RESIN_CLEAR",   price: "$87/L",   colors: ["Clear"] },
-  { label: "Resin — Tough ABS",    id: "RESIN_TOUGH",   price: "$155/L",  colors: ["Grey"] },
-  { label: "Resin — White",        id: "RESIN_WHITE",   price: "$89/L",   colors: ["White"] },
-  { label: "Resin — Black",        id: "RESIN_BLACK",   price: "$89/L",   colors: ["Black"] },
-  { label: "Resin — ClearLight Blue ABS", id: "RESIN_CLEAR_BLUE", price: "$20/L", colors: ["Light Blue Clear"] },
-];
+// ── Print Type ────────────────────────────────────────────────────────────────
+type PrintType = "FDM" | "SLA";
 
-const COLORS = [
-  { label: "Any Color",  hex: "#00bcd4" },
-  { label: "White",      hex: "#ffffff" },
-  { label: "Black",      hex: "#222222" },
-  { label: "Grey",       hex: "#9e9e9e" },
-  { label: "Silver",     hex: "#e0e0e0" },
-  { label: "Red",        hex: "#e53935" },
-  { label: "Blue",       hex: "#1e88e5" },
-  { label: "Light Blue Clear", hex: "#81d4fa" },
-  { label: "Green",      hex: "#43a047" },
-  { label: "Yellow",     hex: "#fdd835" },
-  { label: "Orange",     hex: "#fb8c00" },
-  { label: "Purple",     hex: "#8e24aa" },
-  { label: "Clear",      hex: "#e0f7fa" },
-];
+// ── Color hex map ─────────────────────────────────────────────────────────────
+const COLOR_HEX: Record<string, string> = {
+  "Red":             "#e53935",
+  "Green":           "#43a047",
+  "Blue":            "#1e88e5",
+  "Orange":          "#fb8c00",
+  "Gray":            "#9e9e9e",
+  "Silver":          "#e0e0e0",
+  "Black":           "#222222",
+  "White":           "#ffffff",
+  "Purple":          "#8e24aa",
+  "Grey":            "#9e9e9e",
+  "Yellow":          "#fdd835",
+  "Clear":           "#e0f7fa",
+  "Light Blue Clear":"#81d4fa",
+};
 
+// ── FDM Infill options ────────────────────────────────────────────────────────
 const INFILL_OPTIONS = [
   { label: "Light (10%)",    value: 10  },
   { label: "Standard (20%)", value: 20  },
@@ -56,42 +41,95 @@ interface ConfigPanelProps {
   selectedColor: string;
   modelStats: { dimensions: string; volume: string; surface: string; weight: string };
   modelName?: string;
-  /** File object passed from parent (either uploaded or preset-fetched) */
   uploadedFile?: File | null;
 }
 
 export default function ConfigPanel({
   onFileUpload,
   onColorChange,
-  selectedColor,
   modelStats,
   modelName = "bear.stl",
   uploadedFile: externalFile = null,
 }: ConfigPanelProps) {
+  // Print type toggle
+  const [printType, setPrintType] = useState<PrintType>("FDM");
+
+  // Dynamic Materials State
+  const [dbMaterials, setDbMaterials] = useState<any[]>([]);
+  const [loadingMaterials, setLoadingMaterials] = useState(true);
+
+  // Material index
   const [materialIdx, setMaterialIdx] = useState(0);
-  const [colorIdx,    setColorIdx]    = useState(0);
-  const [infillIdx,   setInfillIdx]   = useState(1); // default: Standard 20%
-  const [quantity,    setQuantity]    = useState(1);
-  // Own uploaded file (from drag-drop/browse). Merges with externalFile from parent.
+
+  // Infill (SLA is always 100)
+  const [infillIdx, setInfillIdx] = useState(1); // default: Standard 20%
+
+  // Quantity
+  const [quantity, setQuantity] = useState(1);
+
+  // File state
   const [ownUploadedFile, setOwnUploadedFile] = useState<File | null>(null);
   const activeFile = ownUploadedFile ?? externalFile;
 
   // Cart state
-  const [isAddingToCart,  setIsAddingToCart]  = useState(false);
-  const [cartError,       setCartError]       = useState<string | null>(null);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [cartError, setCartError] = useState<string | null>(null);
 
-  // ── Real-time quote from /api/quote ────────────────────────────────────────
+  // Color index — reset when material changes
+  const [colorIdx, setColorIdx] = useState(0);
+
+  useEffect(() => {
+    async function loadMats() {
+      const { data } = await supabase.from("materials").select("*").eq("is_active", true).order('created_at');
+      if (data) {
+        setDbMaterials(data);
+      }
+      setLoadingMaterials(false);
+    }
+    loadMats();
+  }, []);
+
+  const materials = dbMaterials.filter(m => m.type === printType).map(m => ({
+    label: m.label, id: m.id, price: m.price_label, colors: m.colors || []
+  }));
+
+  const currentMaterial = materials[materialIdx] ?? materials[0];
+  const availableColors = currentMaterial?.colors || [];
+
+  // Update color when materials load
+  useEffect(() => {
+    if (availableColors.length > 0 && availableColors[colorIdx]) {
+      onColorChange(COLOR_HEX[availableColors[colorIdx]] ?? "#00bcd4");
+    }
+  }, [materials.length, materialIdx, colorIdx, availableColors]);
+
+  // Infill value — SLA is always 100%
+  const effectiveInfill = printType === "SLA" ? 100 : INFILL_OPTIONS[infillIdx].value;
+
+  // ── Real-time quote ─────────────────────────────────────────────────────────
   const { quote, isLoading: isQuoteLoading, error: quoteError } = useQuote({
     file: activeFile,
-    material: MATERIALS[materialIdx].id,
-    infill: INFILL_OPTIONS[infillIdx].value,
+    material: currentMaterial?.id || "PLA",
+    infill: effectiveInfill,
     quantity,
     debounceMs: 700,
   });
 
+  // ── Handlers ────────────────────────────────────────────────────────────────
+  const handlePrintTypeChange = (type: PrintType) => {
+    setPrintType(type);
+    setMaterialIdx(0);
+    setColorIdx(0);
+  };
+
+  const handleMaterialChange = (idx: number) => {
+    setMaterialIdx(idx);
+    setColorIdx(0);
+  };
+
   const handleColorSelect = (idx: number) => {
     setColorIdx(idx);
-    onColorChange(COLORS[idx].hex);
+    onColorChange(COLOR_HEX[availableColors[idx]] ?? "#00bcd4");
   };
 
   const handleFileAccepted = (file: File) => {
@@ -100,17 +138,13 @@ export default function ConfigPanel({
     setCartError(null);
   };
 
-  // ── Add to Cart ─────────────────────────────────────────────────────────────
+  // ── Checkout ────────────────────────────────────────────────────────────────
   const handleAddToCart = async () => {
     setCartError(null);
-
-
-
     if (!activeFile && !quote) {
       setCartError("Please upload a 3D file first to generate a quote.");
       return;
     }
-
     setIsAddingToCart(true);
     try {
       const result = await createCheckout({
@@ -118,9 +152,10 @@ export default function ConfigPanel({
         quantity,
         price: Math.round((quote?.totalUsd ?? 0) * 100),
         properties: {
-          Material:      MATERIALS[materialIdx].label,
-          Color:         COLORS[colorIdx].label,
-          Infill:        `${INFILL_OPTIONS[infillIdx].value}%`,
+          "Print Type":  printType,
+          Material:      currentMaterial?.label || "Unknown",
+          Color:         availableColors[colorIdx] || "Unknown",
+          Infill:        `${effectiveInfill}%`,
           Dimensions:    modelStats.dimensions,
           Weight:        quote?.display.weight    ?? modelStats.weight,
           "Print Time":  quote?.display.printTime ?? "N/A",
@@ -129,9 +164,7 @@ export default function ConfigPanel({
           _file_name:    modelName,
         },
       });
-
       if (result.success && result.checkoutUrl) {
-        // Redirect the user immediately to the dynamic Draft Order checkout
         window.location.href = result.checkoutUrl;
       }
     } catch (err) {
@@ -144,7 +177,7 @@ export default function ConfigPanel({
   return (
     <div className="w-full md:w-[320px] md:min-w-[320px] h-full bg-panel-bg flex flex-col overflow-y-auto">
 
-      {/* ── Live Price Display ─────────────────────────────────────────────── */}
+      {/* ── Live Price ───────────────────────────────────────────────────────── */}
       <div className="p-5 text-center border-b border-border">
         {quote && !isQuoteLoading ? (
           <>
@@ -156,8 +189,7 @@ export default function ConfigPanel({
               <div className="text-sm text-muted-foreground mt-1">{quote.display.total} total</div>
             )}
             {quote.discountPct > 0 && (
-              <div className="mt-1 inline-block text-xs font-semibold text-green-400
-                             bg-green-400/10 border border-green-400/20 px-2 py-0.5 rounded-full">
+              <div className="mt-1 inline-block text-xs font-semibold text-green-400 bg-green-400/10 border border-green-400/20 px-2 py-0.5 rounded-full">
                 -{quote.discountPct}% qty discount
               </div>
             )}
@@ -168,65 +200,108 @@ export default function ConfigPanel({
             <span className="text-sm">Calculating…</span>
           </div>
         ) : (
-          <div className="text-4xl font-black text-white/20 h-14 flex items-center justify-center">
-            —
-          </div>
+          <div className="text-4xl font-black text-white/20 h-14 flex items-center justify-center">—</div>
         )}
       </div>
 
-      {/* ── Upload ─────────────────────────────────────────────────────────── */}
+      {/* ── Upload ──────────────────────────────────────────────────────────── */}
       <div className="mx-4 my-4">
         <ErrorBoundary>
           <FileUploadComponent onFileAccepted={handleFileAccepted} />
         </ErrorBoundary>
       </div>
 
-      {/* ── Config selectors ────────────────────────────────────────────────── */}
+      {/* ── Config selectors ─────────────────────────────────────────────────── */}
       <div className="px-4 space-y-3 flex-1">
 
-        {/* Material */}
-        <div className="bg-secondary rounded-lg overflow-hidden">
-          <select
-            value={materialIdx}
-            onChange={(e) => setMaterialIdx(+e.target.value)}
-            className="w-full bg-transparent px-4 py-3 text-config-label text-sm font-medium appearance-none cursor-pointer outline-none"
-          >
-            {MATERIALS.map((m, i) => (
-              <option key={i} value={i} className="bg-secondary text-foreground">{m.label}</option>
-            ))}
-          </select>
+        {/* Print Type Toggle */}
+        <div className="bg-secondary rounded-lg flex overflow-hidden">
+          {(["FDM", "SLA"] as PrintType[]).map((type) => (
+            <button
+              key={type}
+              onClick={() => handlePrintTypeChange(type)}
+              className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+                printType === type
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {type}
+            </button>
+          ))}
         </div>
 
-        {/* Color */}
-        <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
-          <select
-            value={colorIdx}
-            onChange={(e) => handleColorSelect(+e.target.value)}
-            className="bg-transparent text-config-label text-sm font-medium appearance-none cursor-pointer outline-none flex-1"
-          >
-            {COLORS.map((c, i) => (
-              <option key={i} value={i} className="bg-secondary text-foreground">{c.label}</option>
-            ))}
-          </select>
-          <div
-            className="w-5 h-5 rounded-full border-2 border-border ml-2 flex-shrink-0"
-            style={{ backgroundColor: COLORS[colorIdx].hex }}
-          />
+        {/* Build volume info */}
+        <div className="text-[10px] text-muted-foreground/60 text-center tracking-wide">
+          {printType === "FDM"
+            ? "Max build: 330L × 240W × 300H mm"
+            : "Max build: 200L × 125W × 210H mm"}
         </div>
 
-        {/* Infill */}
-        <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
-          <select
-            value={infillIdx}
-            onChange={(e) => setInfillIdx(+e.target.value)}
-            className="bg-transparent text-config-label text-sm font-medium appearance-none cursor-pointer outline-none flex-1"
-          >
-            {INFILL_OPTIONS.map((d, i) => (
-              <option key={i} value={i} className="bg-secondary text-foreground">{d.label}</option>
-            ))}
-          </select>
-          <span className="text-config-value text-sm">{INFILL_OPTIONS[infillIdx].value}%</span>
-        </div>
+        {loadingMaterials ? (
+          <div className="py-4 text-center text-sm text-muted-foreground flex justify-center items-center gap-2">
+            <Loader2 size={14} className="animate-spin" /> Loading materials...
+          </div>
+        ) : materials.length === 0 ? (
+          <div className="py-4 text-center text-sm text-destructive">
+            No materials found for {printType}.
+          </div>
+        ) : (
+          <>
+            {/* Material */}
+            <div className="bg-secondary rounded-lg overflow-hidden">
+              <select
+                value={materialIdx}
+                onChange={(e) => handleMaterialChange(+e.target.value)}
+                className="w-full bg-transparent px-4 py-3 text-config-label text-sm font-medium appearance-none cursor-pointer outline-none"
+              >
+                {materials.map((m, i) => (
+                  <option key={i} value={i} className="bg-secondary text-foreground">
+                    {m.label} — {m.price}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Color — only colors available for this material */}
+            <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
+              <select
+                value={colorIdx}
+                onChange={(e) => handleColorSelect(+e.target.value)}
+                className="bg-transparent text-config-label text-sm font-medium appearance-none cursor-pointer outline-none flex-1"
+              >
+                {availableColors.map((c: string, i: number) => (
+                  <option key={i} value={i} className="bg-secondary text-foreground">{c}</option>
+                ))}
+              </select>
+              <div
+                className="w-5 h-5 rounded-full border-2 border-border ml-2 flex-shrink-0"
+                style={{ backgroundColor: COLOR_HEX[availableColors[colorIdx]] ?? "#888" }}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Infill — FDM: dropdown | SLA: locked at 100% */}
+        {printType === "FDM" ? (
+          <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
+            <select
+              value={infillIdx}
+              onChange={(e) => setInfillIdx(+e.target.value)}
+              className="bg-transparent text-config-label text-sm font-medium appearance-none cursor-pointer outline-none flex-1"
+            >
+              {INFILL_OPTIONS.map((d, i) => (
+                <option key={i} value={i} className="bg-secondary text-foreground">{d.label}</option>
+              ))}
+            </select>
+            <span className="text-config-value text-sm">{INFILL_OPTIONS[infillIdx].value}%</span>
+          </div>
+        ) : (
+          <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
+            <span className="text-config-label text-sm font-medium">Infill</span>
+            <span className="text-config-value text-sm font-semibold">100% (SLA)</span>
+          </div>
+        )}
 
         {/* Quantity */}
         <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
@@ -248,7 +323,7 @@ export default function ConfigPanel({
           </div>
         </div>
 
-        {/* Price Breakdown panel */}
+        {/* Price breakdown */}
         <PriceBreakdown
           quote={quote}
           isLoading={isQuoteLoading}
@@ -257,7 +332,7 @@ export default function ConfigPanel({
         />
       </div>
 
-      {/* ── Error ───────────────────────────────────────────────────────────── */}
+      {/* ── Cart Error ───────────────────────────────────────────────────────── */}
       {cartError && (
         <div className="mx-4 mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-2">
           <AlertCircle size={16} className="text-destructive mt-0.5 flex-shrink-0" />
@@ -265,7 +340,7 @@ export default function ConfigPanel({
         </div>
       )}
 
-      {/* ── Add to Cart button ──────────────────────────────────────────────── */}
+      {/* ── Checkout button ──────────────────────────────────────────────────── */}
       <div className="p-4 pt-3">
         <button
           id="shopify-add-to-cart-btn"
@@ -281,8 +356,6 @@ export default function ConfigPanel({
             <><ShoppingCart size={16} /> Proceed to Checkout</>
           )}
         </button>
-
-
       </div>
 
     </div>
