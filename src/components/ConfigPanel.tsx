@@ -80,7 +80,10 @@ export default function ConfigPanel({
 
   useEffect(() => {
     async function loadMats() {
-      const { data } = await supabase.from("materials").select("*").eq("is_active", true).order('created_at');
+      const { data, error } = await supabase.from("materials").select("*").eq("is_active", true).order('label');
+      if (error) {
+        console.error("Error loading materials:", error);
+      }
       if (data) {
         setDbMaterials(data);
       }

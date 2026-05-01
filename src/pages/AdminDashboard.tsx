@@ -38,7 +38,7 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const [matRes, setRes] = await Promise.all([
-        supabase.from('materials').select('*').order('created_at'),
+        supabase.from('materials').select('*'),
         supabase.from('app_settings').select('*')
       ]);
 
