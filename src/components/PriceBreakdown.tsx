@@ -2,7 +2,7 @@
  * PriceBreakdown — Live quote display component
  * Shows itemized cost breakdown, print time, weight, printability badge.
  */
-import { Loader2, AlertTriangle, CheckCircle2, ShieldAlert, Trophy } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import type { QuoteResult } from '@/hooks/useQuote';
 
 interface Props {
@@ -12,12 +12,7 @@ interface Props {
   hasFile: boolean;
 }
 
-const GRADE_CONFIG = {
-  EXCELLENT: { icon: Trophy,        color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   label: 'Excellent' },
-  GOOD:      { icon: CheckCircle2,  color: '#3b82f6', bg: 'rgba(59,130,246,0.1)',  label: 'Good'      },
-  WARNING:   { icon: AlertTriangle, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  label: 'Warning'   },
-  FAIL:      { icon: ShieldAlert,   color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   label: 'Needs Fix' },
-};
+
 
 export default function PriceBreakdown({ quote, isLoading, error, hasFile }: Props) {
   // ── Empty state ─────────────────────────────────────────────────────────
@@ -64,9 +59,6 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile }: Pro
 
   if (!quote) return null;
 
-  const grade = GRADE_CONFIG[quote.printabilityGrade] ?? GRADE_CONFIG.GOOD;
-  const GradeIcon = grade.icon;
-
   return (
     <div style={styles.card}>
       {/* Total Price */}
@@ -109,12 +101,34 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile }: Pro
         <StatPill label="Weight" value={quote.display.weight} />
       </div>
 
-      {/* Printability badge */}
-      <div style={{ ...styles.gradeBadge, background: grade.bg, borderColor: grade.color }}>
-        <GradeIcon size={13} color={grade.color} />
-        <span style={{ ...styles.gradeLabel, color: grade.color }}>
-          {grade.label} ({quote.printabilityScore}/100)
-        </span>
+      {/* Printability score */}
+      <div style={styles.printabilityRow}>
+        <span style={styles.printabilityLabel}>Printability</span>
+        <div style={styles.printabilityRight}>
+          <div style={styles.printabilityBar}>
+            <div
+              style={{
+                ...styles.printabilityFill,
+                width: `${quote.printabilityScore}%`,
+                background: quote.printabilityScore >= 80
+                  ? '#22c55e'
+                  : quote.printabilityScore >= 50
+                    ? '#f59e0b'
+                    : '#ef4444',
+              }}
+            />
+          </div>
+          <span style={{
+            ...styles.printabilityScore,
+            color: quote.printabilityScore >= 80
+              ? '#22c55e'
+              : quote.printabilityScore >= 50
+                ? '#f59e0b'
+                : '#ef4444',
+          }}>
+            {quote.printabilityScore}/100
+          </span>
+        </div>
         {quote.needsRepair && (
           <span style={styles.repairNote}>Mesh repair included</span>
         )}
@@ -276,18 +290,40 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 600,
   },
-  gradeBadge: {
+  printabilityRow: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 6,
+  },
+  printabilityLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.1em',
+  },
+  printabilityRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    borderRadius: 8,
-    padding: '7px 10px',
-    border: '1px solid',
+    gap: 8,
   },
-  gradeLabel: {
-    fontSize: 11,
-    fontWeight: 600,
+  printabilityBar: {
     flex: 1,
+    height: 6,
+    borderRadius: 3,
+    background: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  printabilityFill: {
+    height: '100%',
+    borderRadius: 3,
+    transition: 'width 0.4s ease',
+  },
+  printabilityScore: {
+    fontSize: 13,
+    fontWeight: 700,
+    fontVariantNumeric: 'tabular-nums',
+    minWidth: 40,
+    textAlign: 'right' as const,
   },
   repairNote: {
     fontSize: 9,

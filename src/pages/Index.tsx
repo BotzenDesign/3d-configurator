@@ -29,6 +29,7 @@ export default function Index() {
   const [modelType, setModelType] = useState("bear");
   const [modelName, setModelName] = useState("bear.stl");
   const [color, setColor] = useState("#00bcd4");
+  const [printType, setPrintType] = useState<"FDM" | "SLA">("FDM");
   const [uploadedGeometry, setUploadedGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [stats, setStats] = useState(DEFAULT_STATS);
@@ -137,6 +138,7 @@ export default function Index() {
                 modelType={modelType}
                 color={color}
                 geometry={uploadedGeometry}
+                printType={printType}
               />
               <ModelStats {...stats} modelName={modelName} />
               <ModelSelector
@@ -150,6 +152,7 @@ export default function Index() {
               <ConfigPanel
                 onFileUpload={handleFileUpload}
                 onColorChange={setColor}
+                onPrintTypeChange={setPrintType}
                 selectedColor={color}
                 modelStats={stats}
                 modelName={modelName}
@@ -188,6 +191,7 @@ export default function Index() {
         <ConfigPanel
           onFileUpload={handleFileUpload}
           onColorChange={setColor}
+          onPrintTypeChange={setPrintType}
           selectedColor={color}
           modelStats={stats}
           modelName={modelName}
@@ -198,6 +202,7 @@ export default function Index() {
             modelType={modelType}
             color={color}
             geometry={uploadedGeometry}
+            printType={printType}
           />
           <ModelStats {...stats} modelName={modelName} />
           <ModelSelector

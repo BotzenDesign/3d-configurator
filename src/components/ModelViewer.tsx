@@ -30,7 +30,14 @@ interface ModelViewerProps {
   modelType: string;
   color: string;
   geometry: THREE.BufferGeometry | null;
+  printType?: "FDM" | "SLA";
 }
+
+// ── Build Volume Constants ───────────────────────────────────────────────
+const BUILD_VOLUME = {
+  FDM: { l: 330, w: 240, h: 300 },
+  SLA: { l: 200, w: 125, h: 210 },
+} as const;
 
 // ── Auto-Fit Camera ──────────────────────────────────────────────────────
 function AutoFitCamera({ boundingBox }: { boundingBox: THREE.Box3 | null }) {
@@ -171,12 +178,14 @@ function UploadedModel({
   color,
   wireframe,
   maxPolygons,
+  orientation,
   onBoundsComputed,
 }: {
   geometry: THREE.BufferGeometry;
   color: string;
   wireframe: boolean;
   maxPolygons: number;
+  orientation: "portrait" | "landscape";
   onBoundsComputed: (box: THREE.Box3) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -209,8 +218,14 @@ function UploadedModel({
     const scale = 60 / maxDim;
     g.translate(-center.x, -center.y + size.y / 2, -center.z);
     g.scale(scale, scale, scale);
+
+    // Orientation: landscape = rotate 90° around Y axis
+    if (orientation === "landscape") {
+      g.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
+    }
+
     return g;
-  }, [geometry, maxPolygons]);
+  }, [geometry, maxPolygons, orientation]);
 
   useEffect(() => {
     if (meshRef.current) {
@@ -233,7 +248,6 @@ function UploadedModel({
     </mesh>
   );
 }
-
 // ── Viewer Toolbar ───────────────────────────────────────────────────────
 function ViewerToolbar({
   showDimensions,
@@ -243,6 +257,8 @@ function ViewerToolbar({
   showPerf,
   onTogglePerf,
   onResetCamera,
+  orientation,
+  onToggleOrientation,
   isMobile,
   lowPowerMode,
 }: {
@@ -253,6 +269,8 @@ function ViewerToolbar({
   showPerf: boolean;
   onTogglePerf: () => void;
   onResetCamera: () => void;
+  orientation: "portrait" | "landscape";
+  onToggleOrientation: () => void;
   isMobile: boolean;
   lowPowerMode: boolean;
 }) {
@@ -272,6 +290,13 @@ function ViewerToolbar({
       <button className={btnClass(showWireframe)} onClick={onToggleWireframe} title="Toggle wireframe">
         🔲
       </button>
+      <button
+        className={btnClass(orientation === "landscape")}
+        onClick={onToggleOrientation}
+        title={orientation === "portrait" ? "Switch to landscape" : "Switch to portrait"}
+      >
+        {orientation === "portrait" ? "🔄" : "↩️"}
+      </button>
       <button className={btnClass(showPerf)} onClick={onTogglePerf} title="Performance monitor">
         📊
       </button>
@@ -288,14 +313,17 @@ function ViewerToolbar({
 }
 
 // ── Main Viewer ──────────────────────────────────────────────────────────
-export default function ModelViewer({ modelType, color, geometry }: ModelViewerProps) {
+export default function ModelViewer({ modelType, color, geometry, printType = "FDM" }: ModelViewerProps) {
   const device = useDeviceCapabilities();
   const [showDimensions, setShowDimensions] = useState(!device.isMobile);
   const [showWireframe, setShowWireframe] = useState(false);
   const [showPerf, setShowPerf] = useState(false);
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
   const [modelBounds, setModelBounds] = useState<THREE.Box3 | null>(null);
   const [cameraResetKey, setCameraResetKey] = useState(0);
   const [sceneReady, setSceneReady] = useState(false);
+
+  const bv = BUILD_VOLUME[printType];
 
   const handleBoundsComputed = useCallback((box: THREE.Box3) => {
     setModelBounds(box);
@@ -322,9 +350,39 @@ export default function ModelViewer({ modelType, color, geometry }: ModelViewerP
           showPerf={showPerf}
           onTogglePerf={() => setShowPerf((v) => !v)}
           onResetCamera={handleResetCamera}
+          orientation={orientation}
+          onToggleOrientation={() => setOrientation(o => o === "portrait" ? "landscape" : "portrait")}
           isMobile={device.isMobile}
           lowPowerMode={device.lowPowerMode}
         />
+
+        {/* Max Build Volume overlay — top-right corner */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            zIndex: 20,
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 10,
+            padding: '8px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+          }}
+        >
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            Max Build Volume
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)', fontVariantNumeric: 'tabular-nums' }}>
+            {bv.l}L × {bv.w}W × {bv.h}H mm
+          </span>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
+            {printType === 'FDM' ? 'Ultimaker S8' : 'Form 4'}
+          </span>
+        </div>
 
         <Canvas
           camera={{ position: [120, 80, 120], fov: 50 }}
@@ -380,6 +438,7 @@ export default function ModelViewer({ modelType, color, geometry }: ModelViewerP
                 color={color}
                 wireframe={showWireframe}
                 maxPolygons={device.maxPolygons}
+                orientation={orientation}
                 onBoundsComputed={handleBoundsComputed}
               />
             ) : (

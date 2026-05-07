@@ -38,6 +38,7 @@ const INFILL_OPTIONS = [
 interface ConfigPanelProps {
   onFileUpload: (file: File) => void;
   onColorChange: (hex: string) => void;
+  onPrintTypeChange?: (type: PrintType) => void;
   selectedColor: string;
   modelStats: { dimensions: string; volume: string; surface: string; weight: string };
   modelName?: string;
@@ -47,6 +48,7 @@ interface ConfigPanelProps {
 export default function ConfigPanel({
   onFileUpload,
   onColorChange,
+  onPrintTypeChange,
   modelStats,
   modelName = "bear.stl",
   uploadedFile: externalFile = null,
@@ -123,6 +125,7 @@ export default function ConfigPanel({
     setPrintType(type);
     setMaterialIdx(0);
     setColorIdx(0);
+    onPrintTypeChange?.(type);
   };
 
   const handleMaterialChange = (idx: number) => {
