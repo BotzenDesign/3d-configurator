@@ -37,6 +37,17 @@ CREATE TABLE IF NOT EXISTS public.materials (
 ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.materials    ENABLE ROW LEVEL SECURITY;
 
+-- Add description column to app_settings if it doesn't exist yet
+-- (handles databases created before this column was added)
+ALTER TABLE public.app_settings
+  ADD COLUMN IF NOT EXISTS description text;
+
+-- Add Botzen Formula columns to materials if they don't exist yet
+-- (handles databases created from the original setup_admin.sql)
+ALTER TABLE public.materials
+  ADD COLUMN IF NOT EXISTS spool_cost     numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS spool_quantity numeric NOT NULL DEFAULT 1;
+
 -- ── 4. RLS Policies ──────────────────────────────────────────────────────────
 -- Public can read all (needed for the configurator and quote engine)
 DO $$ BEGIN
@@ -119,4 +130,4 @@ SELECT
 FROM public.materials
 ORDER BY type, label;
 
-SELECT key, value, description FROM public.app_settings ORDER BY key;
+SELECT key, value FROM public.app_settings ORDER BY key;
