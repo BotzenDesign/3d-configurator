@@ -680,26 +680,20 @@ export interface Material {
   name: string;
   /** Density in g/cm³ */
   densityGcm3: number;
-  /** Cost per gram in USD — sourced directly from PDF spool price */
+  /** @deprecated Use spoolCost/spoolQuantity instead. Kept for fallback only. */
   costPerGram: number;
-  /** Typical nozzle temperature °C (0 for resin = UV cure) */
-  nozzleTemp: number;
-  /** Typical bed temperature °C */
-  bedTemp: number;
+  /** M — Total purchase price of the spool or resin bottle in USD */
+  spoolCost: number;
+  /** L (FDM) — Total filament length on the spool in meters
+   *  V (SLA) — Total resin volume in the bottle in mL */
+  spoolQuantity: number;
   /** Max recommended print speed mm/s (0 for resin) */
   maxSpeedMms: number;
-  /** Layer adhesion quality (1-5) */
-  layerAdhesion: number;
-  /** Flexibility rating (1=rigid, 5=very flexible) */
-  flexibility: number;
-  /** Whether support material is often needed */
-  requiresSupport: boolean;
   /** Is this an SLA resin (true) or FDM filament (false) */
   isResin: boolean;
   description: string;
-  /** Available colors from the PDF */
+  /** Available colors */
   availableColors: string[];
-  color: string; // UI accent color
 }
 
 export let MATERIALS: Record<MaterialId, Material> = {}; // Will be populated from DB
@@ -818,46 +812,60 @@ export class MaterialEstimationEngine {
 
     const material = MATERIALS[materialId];
 
-    // 1. Effective fill ratio considering shells and infill
-    const fillRatio = effectiveInfillRatio(volumeCm3, { size }, infill, layerHeightMm);
+    // ── FDM uses WEIGHT for cost. SLA uses VOLUME for cost (per PDF spec). ──
+    const isSLA = material.isResin;
+
+    // 1. Effective fill ratio (FDM only; SLA cures the full cross-section)
+    const fillRatio = isSLA ? 1.0 : effectiveInfillRatio(volumeCm3, { size }, infill, layerHeightMm);
     const effectiveVolumeCm3 = volumeCm3 * fillRatio;
 
-    // 2. Model weight
+    // 2. Model weight (used for FDM cost & display; SLA also tracks it for reference)
     const modelWeightGrams = effectiveVolumeCm3 * material.densityGcm3;
 
-    // 3. Support material (estimated as % of bounding box volume beneath overhangs)
+    // 3. Support material
     let supportWeightGrams = 0;
-    if (needsSupport || material.requiresSupport) {
-      const supportVolumeCm3 = volumeCm3 * supportFraction * SUPPORT_DENSITY;
+    let supportVolumeCm3 = 0;
+    if (needsSupport || material.isResin) {
+      supportVolumeCm3 = volumeCm3 * supportFraction * SUPPORT_DENSITY;
       supportWeightGrams = supportVolumeCm3 * material.densityGcm3;
     }
 
-    // 4. Waste factor
-    const wasteMaterialGrams = (modelWeightGrams + supportWeightGrams) * (WASTE_FACTOR - 1);
+    // 4. Waste factor (FDM only — purge lines, skirt; SLA resin waste is negligible)
+    const wasteMaterialGrams = isSLA ? 0 : (modelWeightGrams + supportWeightGrams) * (WASTE_FACTOR - 1);
     const totalWeightGrams = modelWeightGrams + supportWeightGrams + wasteMaterialGrams;
 
-    // 5. Filament length
-    // Volume → length: V = π(d/2)² × L → L = V / (π × r²)
+    // 5. Filament length (FDM only)
     const filamentRadiusCm = (FILAMENT_DIAMETER_MM / 2) / 10;
-    const filamentLengthCm = (totalWeightGrams / material.densityGcm3) /
+    const filamentLengthCm = isSLA ? 0 : (totalWeightGrams / material.densityGcm3) /
       (Math.PI * filamentRadiusCm * filamentRadiusCm);
     const filamentLengthM = filamentLengthCm / 100;
 
     // 6. Material cost
-    const materialCostUsd = totalWeightGrams * material.costPerGram;
+    // FDM: cost = weight_grams × cost_per_gram  (e.g. 96g × $0.0667/g = $6.40)
+    // SLA: cost = volume_mL   × cost_per_mL     (e.g. 86.24mL × $0.089/mL = $7.68)
+    //            Note: 1 cm³ = 1 mL, so volumeCm3 IS the volume in mL.
+    //            costPerGram in the DB stores cost_per_mL for SLA materials.
+    let materialCostUsd: number;
+    if (isSLA) {
+      // SLA: volume-based pricing (1 cm³ = 1 mL)
+      const totalVolumeMl = effectiveVolumeCm3 + supportVolumeCm3;
+      materialCostUsd = totalVolumeMl * material.costPerGram; // costPerGram = cost_per_mL for SLA
+    } else {
+      // FDM: weight-based pricing
+      materialCostUsd = totalWeightGrams * material.costPerGram;
+    }
 
     // 7. Print time estimate
     let printTimeMinutes = 0;
-    if (material.id === 'RESIN') {
-      // SLA time is strictly Z-height based. Assume 10 seconds per layer (cure + peel + lift)
-      // Standard SLA layer height: 0.05mm
-      const layerCount = size.z / 0.05; 
-      const printTimeSeconds = layerCount * 10;
+    if (isSLA) {
+      // SLA: Z-height based. Form 4 uses ~0.1mm layers; ~6s per layer (cure + lift)
+      const layerCount = size.z / 0.1;
+      const printTimeSeconds = layerCount * 6;
       printTimeMinutes = Math.max(5, Math.round(printTimeSeconds / 60));
     } else {
-      // FDM time based on nozzle travel
+      // FDM: nozzle travel based (0.2mm layers, 0.4mm nozzle)
       const layerCount = size.z / layerHeightMm;
-      const printSpeedMms = Math.max(1, Math.min(material.maxSpeedMms, 60)); // avoid div by zero
+      const printSpeedMms = Math.max(1, Math.min(material.maxSpeedMms, 60));
       const avgLayerTravelMm = Math.sqrt(size.x * size.y) * (1 + fillRatio * 2);
       const printTimeSeconds = (layerCount * avgLayerTravelMm) / printSpeedMms;
       printTimeMinutes = Math.max(5, Math.round(printTimeSeconds / 60));
@@ -909,57 +917,42 @@ export const materialEstimationEngine = new MaterialEstimationEngine();
 
 /**
  * ============================================================================
- * Pricing Service — Dynamic Quote Engine
+ * Pricing Service — Botzen Formula
  * ============================================================================
- * Calculates the final customer price for a 3D print order.
  *
- * Price Formula:
- *   Base Price = Material Cost + Machine Time Cost
- *   Surcharges = Complexity Fee + Non-Manifold Repair Fee + Rush Fee
- *   Subtotal   = (Base Price + Surcharges) × Markup
- *   Total      = Subtotal × Quantity — Volume Discount
+ * Variables (all configurable via Admin Dashboard):
+ *   M  = Material cost $ (purchase price of spool/bottle)     — per material
+ *   L  = Length of filament on spool in meters (FDM)          — per material
+ *   V  = Volume of purchased resin in mL (SLA)                — per material
+ *   Y  = 2× material multiplier                               — global setting
+ *   W  = Fixed run time multiplier (default 1.25)             — global setting
+ *   T  = Machine part run time in hours                       — calculated from geometry
+ *   A  = Length of job filament needed in meters (FDM)        — calculated from geometry
+ *   B  = Volume of job resin needed in mL (SLA)               — calculated from geometry
+ *
+ * Formulas:
+ *   FDM Total = (Y × M / L × A) + W × T
+ *   SLA Total = (Y × M / V × B) + W × T
  *
  * All prices in USD.
  * ============================================================================
  */
 
-
-
-
 // ── Pricing Configuration ─────────────────────────────────────────────────────
 
 export interface PricingConfig {
-  /** Markup multiplier applied over raw material cost (e.g. 3.5 = 250% margin) */
-  markupMultiplier: number;
-  /** Machine cost per hour of print time in USD */
-  machineHourlyRateUsd: number;
-  /** Base setup fee per order regardless of size */
-  setupFeeUsd: number;
-  /** Minimum order price */
-  minimumPriceUsd: number;
-  /** Complexity surcharge tiers (triangle count thresholds) */
-  complexitySurcharge: {
-    medium: { threshold: number; feeUsd: number };
-    high:   { threshold: number; feeUsd: number };
-    ultra:  { threshold: number; feeUsd: number };
-  };
-  /** Non-manifold mesh repair fee */
-  repairFeeUsd: number;
+  /** Y — Material cost multiplier (e.g. 2 = 2× the raw material cost) */
+  materialMultiplierY: number;
+  /** W — Fixed run-time multiplier in $/hour (e.g. 1.25 = $1.25 per print-hour) */
+  runTimeMultiplierW: number;
   /** Quantity discount tiers */
   quantityDiscounts: Array<{ minQty: number; discountPct: number }>;
 }
 
 const DEFAULT_CONFIG: PricingConfig = {
-  markupMultiplier: 3.5,
-  machineHourlyRateUsd: 2.50,
-  setupFeeUsd: 3.00,
-  minimumPriceUsd: 5.00,
-  complexitySurcharge: {
-    medium: { threshold: 50_000,  feeUsd: 1.50 },
-    high:   { threshold: 200_000, feeUsd: 4.00 },
-    ultra:  { threshold: 500_000, feeUsd: 9.00 },
-  },
-  repairFeeUsd: 5.00,
+  // Overridden at runtime from app_settings table in Supabase.
+  materialMultiplierY: 2.0,   // Y: 2× material multiplier (client spec)
+  runTimeMultiplierW:  1.25,  // W: fixed run time multiplier (client spec)
   quantityDiscounts: [
     { minQty: 5,  discountPct: 5  },
     { minQty: 10, discountPct: 10 },
@@ -1022,7 +1015,20 @@ export class PricingService {
   }
 
   /**
-   * Generate a full price quote from geometry analysis + material estimation.
+   * Generate a full price quote using the Botzen formula.
+   *
+   * FDM: Total = (Y × M/L × A) + W × T
+   * SLA: Total = (Y × M/V × B) + W × T
+   *
+   * Variables:
+   *   Y = materialMultiplierY  (global, from app_settings)
+   *   M = material.spoolCost   (per material, from DB)
+   *   L = material.spoolQuantity meters  (FDM, from DB)
+   *   V = material.spoolQuantity mL      (SLA, from DB)
+   *   W = runTimeMultiplierW   (global, from app_settings)
+   *   T = print time in hours  (calculated from geometry)
+   *   A = filament used in meters (FDM, from estimation engine)
+   *   B = resin volume used in mL (SLA, from estimation engine = effectiveVolumeCm3)
    */
   quote(
     geometry: GeometryAnalysisResult,
@@ -1030,85 +1036,55 @@ export class PricingService {
     quantity: number = 1
   ): QuoteResult {
     const { config } = this;
+    const mat = estimation.material;
+    const isSLA = mat.isResin;
     const lineItems: PriceLineItem[] = [];
 
-    // ── 1. Material Cost ────────────────────────────────────────────────────
-    const materialCost = estimation.totalWeightGrams * estimation.material.costPerGram;
+    // ── Extract Botzen variables ─────────────────────────────────────────────
+    const Y = config.materialMultiplierY;  // material multiplier
+    const W = config.runTimeMultiplierW;   // run-time multiplier ($/hr)
+    const M = mat.spoolCost;               // purchase price of spool/bottle
+    const Q = mat.spoolQuantity;           // L (meters) for FDM, V (mL) for SLA
+    const T = estimation.estimatedPrintMinutes / 60; // print time in hours
+
+    // ── 1. Material Cost ─────────────────────────────────────────────────────
+    // FDM: Y × (M/L) × A  where A = filament meters used
+    // SLA: Y × (M/V) × B  where B = resin mL used (1 cm³ = 1 mL)
+    let materialCost: number;
+    let materialNote: string;
+
+    if (isSLA) {
+      const B = estimation.effectiveVolumeCm3; // B: mL of resin used
+      const costPerMl = M / Q;                 // M/V
+      materialCost = Y * costPerMl * B;        // Y × M/V × B
+      materialNote = `Y(${Y}) × $${M}/${Q}mL × ${B.toFixed(2)}mL`;
+    } else {
+      const A = estimation.filamentLengthM;    // A: meters of filament used
+      const costPerMeter = M / Q;              // M/L
+      materialCost = Y * costPerMeter * A;    // Y × M/L × A
+      materialNote = `Y(${Y}) × $${M}/${Q}m × ${A.toFixed(2)}m`;
+    }
+
     lineItems.push({
-      label: `Material (${estimation.material.name})`,
-      amountUsd: materialCost,
-      note: `${estimation.totalWeightGrams.toFixed(1)}g × $${estimation.material.costPerGram}/g`,
+      label: `Material — ${mat.name}`,
+      amountUsd: +materialCost.toFixed(4),
+      note: materialNote,
     });
 
-    // ── 2. Machine Time Cost ────────────────────────────────────────────────
-    let machineCost = 0;
-    if (estimation.material.id !== 'RESIN') {
-      const printHours = estimation.estimatedPrintMinutes / 60;
-      machineCost = printHours * config.machineHourlyRateUsd;
-      lineItems.push({
-        label: 'Machine Time',
-        amountUsd: machineCost,
-        note: `${estimation.estimatedPrintTime} @ $${config.machineHourlyRateUsd}/hr`,
-      });
-    }
-
-    // ── 3. Setup Fee ────────────────────────────────────────────────────────
+    // ── 2. Machine Run Time ──────────────────────────────────────────────────
+    // W × T  (applies to both FDM and SLA)
+    const machineCost = W * T;
     lineItems.push({
-      label: 'Setup & Slicing',
-      amountUsd: config.setupFeeUsd,
-      note: 'Per-order setup fee',
+      label: 'Machine Run Time',
+      amountUsd: +machineCost.toFixed(4),
+      note: `W(${W}) × ${estimation.estimatedPrintTime} (${T.toFixed(2)}h)`,
     });
 
-    // ── 4. Apply Markup ─────────────────────────────────────────────────────
-    const subtotalBeforeMarkup = materialCost + machineCost + config.setupFeeUsd;
-    const markupAmount = subtotalBeforeMarkup * (config.markupMultiplier - 1);
-    lineItems.push({
-      label: 'Service Margin',
-      amountUsd: markupAmount,
-      note: `${((config.markupMultiplier - 1) * 100).toFixed(0)}% margin`,
-    });
+    // ── 3. Unit Price ────────────────────────────────────────────────────────
+    const rawUnit = materialCost + machineCost;
+    const unitPriceUsd = rawUnit;
 
-    // ── 5. Complexity Surcharge ─────────────────────────────────────────────
-    const triCount = geometry.quality.triangleCount;
-    let complexityFee = 0;
-    let complexityNote = '';
-
-    if (triCount >= config.complexitySurcharge.ultra.threshold) {
-      complexityFee = config.complexitySurcharge.ultra.feeUsd;
-      complexityNote = `Ultra-complex mesh (${(triCount / 1000).toFixed(0)}k tris)`;
-    } else if (triCount >= config.complexitySurcharge.high.threshold) {
-      complexityFee = config.complexitySurcharge.high.feeUsd;
-      complexityNote = `High-complexity mesh (${(triCount / 1000).toFixed(0)}k tris)`;
-    } else if (triCount >= config.complexitySurcharge.medium.threshold) {
-      complexityFee = config.complexitySurcharge.medium.feeUsd;
-      complexityNote = `Medium-complexity mesh (${(triCount / 1000).toFixed(0)}k tris)`;
-    }
-
-    if (complexityFee > 0) {
-      lineItems.push({
-        label: 'Complexity Surcharge',
-        amountUsd: complexityFee,
-        note: complexityNote,
-      });
-    }
-
-    // ── 6. Non-Manifold Repair Fee ──────────────────────────────────────────
-    const needsRepair = !geometry.quality.isManifold &&
-      (geometry.quality.nonManifoldEdges > 0 || geometry.quality.boundaryEdges > 5);
-
-    if (needsRepair) {
-      lineItems.push({
-        label: 'Mesh Repair',
-        amountUsd: config.repairFeeUsd,
-        note: `${geometry.quality.nonManifoldEdges} non-manifold edge(s) detected`,
-      });
-    }
-
-    // ── 7. Unit Price ───────────────────────────────────────────────────────
-    const rawUnit = lineItems.reduce((sum, item) => sum + item.amountUsd, 0);
-    const unitPriceUsd = Math.max(config.minimumPriceUsd, rawUnit);
-
-    // ── 8. Quantity Discount ────────────────────────────────────────────────
+    // ── 4. Quantity Discount ─────────────────────────────────────────────────
     const safeQty = Math.max(1, Math.floor(quantity));
     const discountTier = [...config.quantityDiscounts]
       .reverse()
@@ -1119,6 +1095,10 @@ export class PricingService {
     const discountAmountUsd = subtotalBeforeDiscount * (discountPct / 100);
     const totalUsd = subtotalBeforeDiscount - discountAmountUsd;
     const perUnitUsd = totalUsd / safeQty;
+
+    // Printability check (geometry quality flag — no charge, just informational)
+    const needsRepair = !geometry.quality.isManifold &&
+      (geometry.quality.nonManifoldEdges > 0 || geometry.quality.boundaryEdges > 5);
 
     return {
       lineItems,
@@ -1134,7 +1114,9 @@ export class PricingService {
         perUnit: formatUsd(perUnitUsd),
         discount: discountPct > 0 ? `-${discountPct}% (${formatUsd(discountAmountUsd)})` : 'None',
         printTime: estimation.estimatedPrintTime,
-        weight: `${estimation.totalWeightGrams.toFixed(1)}g`,
+        weight: isSLA
+          ? `${estimation.effectiveVolumeCm3.toFixed(1)} mL`
+          : `${estimation.totalWeightGrams.toFixed(1)}g`,
       },
       needsRepair,
       printabilityGrade: geometry.printability.grade,
@@ -1143,14 +1125,21 @@ export class PricingService {
   }
 
   /**
-   * Quick price estimate from raw volume + material (no geometry analysis needed).
-   * Used for real-time "ballpark" pricing before a file is analyzed.
+   * Quick price estimate from raw volume + material (no full geometry analysis needed).
+   * Uses the Botzen formula with the material's own spool cost/quantity.
+   *
+   * FDM: Y × (M/L) × filamentMeters
+   * SLA: Y × (M/V) × volumeMl
    */
-  quickEstimate(volumeCm3: number, materialCostPerGram: number, densityGcm3: number): number {
-    const weightGrams = volumeCm3 * densityGcm3;
-    const materialCost = weightGrams * materialCostPerGram;
-    const raw = (materialCost + this.config.setupFeeUsd) * this.config.markupMultiplier;
-    return Math.max(this.config.minimumPriceUsd, +raw.toFixed(2));
+  quickEstimate(volumeCm3: number, material: Material, filamentLengthM = 0): number {
+    const Y = this.config.materialMultiplierY;
+    const M = material.spoolCost;
+    const Q = material.spoolQuantity;
+    if (material.isResin) {
+      return +(Y * (M / Q) * volumeCm3).toFixed(2); // B = volumeCm3 mL
+    } else {
+      return +(Y * (M / Q) * filamentLengthM).toFixed(2); // A = meters
+    }
   }
 }
 
@@ -1194,36 +1183,33 @@ serve(async (req) => {
       supabase.from("app_settings").select("*")
     ]);
 
-    // Reconstruct MATERIALS record
+    // Reconstruct MATERIALS record from DB rows
     MATERIALS = (dbMaterials || []).reduce((acc: any, mat: any) => {
+      const isSLA = mat.type === 'SLA';
       acc[mat.id] = {
-        id: mat.id,
-        name: mat.label,
-        densityGcm3: Number(mat.density_gcm3),
-        costPerGram: Number(mat.cost_per_gram),
-        nozzleTemp: mat.type === 'SLA' ? 0 : 210,
-        bedTemp: mat.type === 'SLA' ? 0 : 60,
-        maxSpeedMms: mat.type === 'SLA' ? 0 : 80,
-        layerAdhesion: 5,
-        flexibility: 2,
-        requiresSupport: mat.type === 'SLA',
-        isResin: mat.type === 'SLA',
-        description: mat.price_label,
+        id:              mat.id,
+        name:            mat.label,
+        densityGcm3:     Number(mat.density_gcm3),
+        costPerGram:     Number(mat.cost_per_gram),      // legacy fallback
+        spoolCost:       Number(mat.spool_cost ?? mat.cost_per_gram * (isSLA ? 1000 : 335)), // M
+        spoolQuantity:   Number(mat.spool_quantity ?? (isSLA ? 1000 : 335)), // L (m) or V (mL)
+        maxSpeedMms:     isSLA ? 0 : 80,
+        isResin:         isSLA,
+        description:     mat.price_label,
         availableColors: mat.colors || [],
-        color: '#00bcd4', // default
       };
       return acc;
     }, {});
 
-    // Reconstruct pricing config
+    // Reconstruct pricing config from app_settings
     const settingsMap = (dbSettings || []).reduce((acc: any, s: any) => {
       acc[s.key] = s.value;
       return acc;
     }, {});
 
     pricingService.setConfig({
-      markupMultiplier: Number(settingsMap.markup_multiplier ?? 1.0),
-      setupFeeUsd: Number(settingsMap.base_setup_fee ?? 0.0),
+      materialMultiplierY: Number(settingsMap.material_multiplier_Y ?? 2.0),
+      runTimeMultiplierW:  Number(settingsMap.run_time_multiplier_W ?? 1.25),
     });
     
     // Also update FileValidationService dynamic max file size if present

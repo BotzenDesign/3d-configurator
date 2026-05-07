@@ -109,12 +109,12 @@ export default function AdminDashboard() {
         const { error } = await supabase
           .from('materials')
           .update({
-            label: currentMaterial.label,
-            price_label: currentMaterial.price_label,
-            type: currentMaterial.type,
-            density_gcm3: currentMaterial.density_gcm3,
-            cost_per_gram: currentMaterial.cost_per_gram,
-            colors: currentMaterial.colors,
+            label:          currentMaterial.label,
+            price_label:    currentMaterial.price_label,
+            type:           currentMaterial.type,
+            spool_cost:     currentMaterial.spool_cost,
+            spool_quantity: currentMaterial.spool_quantity,
+            colors:         currentMaterial.colors,
           })
           .eq('id', currentMaterial.id);
         if (error) throw error;
@@ -159,8 +159,10 @@ export default function AdminDashboard() {
                   label: '',
                   price_label: '',
                   type: 'FDM',
-                  density_gcm3: 1.0,
-                  cost_per_gram: 0.05,
+                  density_gcm3: 1.24,
+                  cost_per_gram: 0.035,
+                  spool_cost: 35,
+                  spool_quantity: 335,
                   colors: [],
                   is_active: true,
                   isNew: true
@@ -176,11 +178,12 @@ export default function AdminDashboard() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Type</TableHead>
-                    <TableHead>ID</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>Density (g/cm³)</TableHead>
-                    <TableHead>Cost/Gram ($)</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead title="M: Purchase price of spool/bottle">M — Spool Cost ($)</TableHead>
+                    <TableHead title="L (FDM meters) / V (SLA mL)">L/V — Qty</TableHead>
+                    <TableHead title="M/L or M/V: unit rate">Unit Rate</TableHead>
+                    <TableHead>Colors</TableHead>
+                    <TableHead>Active</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -188,18 +191,29 @@ export default function AdminDashboard() {
                   {materials.map((mat) => (
                     <TableRow key={mat.id}>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${mat.type === 'SLA' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${mat.type === 'SLA' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'}`}>
                           {mat.type}
                         </span>
                       </TableCell>
-                      <TableCell className="font-medium">{mat.id}</TableCell>
-                      <TableCell>{mat.label}</TableCell>
-                      <TableCell>{mat.density_gcm3}</TableCell>
-                      <TableCell>${Number(mat.cost_per_gram).toFixed(3)}</TableCell>
+                      <TableCell className="font-medium">
+                        <div>{mat.label}</div>
+                        <div className="text-xs text-muted-foreground">{mat.id}</div>
+                      </TableCell>
+                      <TableCell>${Number(mat.spool_cost ?? 0).toFixed(2)}</TableCell>
                       <TableCell>
-                        <Switch 
-                          checked={mat.is_active} 
-                          onCheckedChange={() => handleToggleMaterialActive(mat.id, mat.is_active)} 
+                        {Number(mat.spool_quantity ?? 0).toFixed(0)}
+                        <span className="text-xs text-muted-foreground ml-1">{mat.type === 'SLA' ? 'mL' : 'm'}</span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {mat.spool_quantity > 0
+                          ? `$${(Number(mat.spool_cost) / Number(mat.spool_quantity)).toFixed(4)}/${mat.type === 'SLA' ? 'mL' : 'm'}`
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-xs">{Array.isArray(mat.colors) ? mat.colors.join(', ') : mat.colors}</TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={mat.is_active}
+                          onCheckedChange={() => handleToggleMaterialActive(mat.id, mat.is_active)}
                         />
                       </TableCell>
                       <TableCell className="text-right space-x-2">
@@ -217,7 +231,7 @@ export default function AdminDashboard() {
                   ))}
                   {materials.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No materials found. Add one to get started.
                       </TableCell>
                     </TableRow>
@@ -229,33 +243,48 @@ export default function AdminDashboard() {
           
           <TabsContent value="settings">
             <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-              <h2 className="text-lg font-semibold mb-4 text-foreground">Global Pricing Configuration</h2>
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-foreground">Global Pricing Variables</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Botzen Formula: <code className="bg-muted px-1 rounded">FDM = (Y×M/L×A) + W×T</code> &nbsp;|&nbsp;
+                  <code className="bg-muted px-1 rounded">SLA = (Y×M/V×B) + W×T</code>
+                </p>
+              </div>
               <div className="space-y-6 max-w-xl">
-                {settings.map((setting) => (
-                  <div key={setting.key} className="space-y-2">
-                    <Label htmlFor={setting.key} className="font-medium capitalize text-foreground">
-                      {setting.key.replace(/_/g, ' ')}
-                    </Label>
-                    <p className="text-sm text-muted-foreground mb-2">{setting.description}</p>
-                    <div className="flex gap-2">
-                      <Input 
-                        id={setting.key} 
-                        defaultValue={setting.value} 
-                        onChange={(e) => {
-                          const newSettings = [...settings];
-                          const idx = newSettings.findIndex(s => s.key === setting.key);
-                          newSettings[idx].value = e.target.value;
-                          setSettings(newSettings);
-                        }}
-                      />
-                      <Button onClick={() => handleSaveSetting(setting.key, setting.value)} className="flex items-center gap-2">
-                        <Save className="w-4 h-4" /> Save
-                      </Button>
+                {settings.map((setting) => {
+                  const descriptions: Record<string, string> = {
+                    material_multiplier_Y: 'Y — Material multiplier. Applied to raw material cost (e.g. 2.0 = 2× the material cost).',
+                    run_time_multiplier_W: 'W — Run time multiplier in $/hour. Charged per hour of machine print time (e.g. 1.25 = $1.25/hr).',
+                    max_file_size_mb: 'Maximum upload file size in megabytes.',
+                  };
+                  return (
+                    <div key={setting.key} className="space-y-2">
+                      <Label htmlFor={setting.key} className="font-medium text-foreground">
+                        {setting.key.replace(/_/g, ' ')}
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        {descriptions[setting.key] ?? setting.description ?? ''}
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          id={setting.key}
+                          defaultValue={setting.value}
+                          onChange={(e) => {
+                            const newSettings = [...settings];
+                            const idx = newSettings.findIndex(s => s.key === setting.key);
+                            newSettings[idx].value = e.target.value;
+                            setSettings(newSettings);
+                          }}
+                        />
+                        <Button onClick={() => handleSaveSetting(setting.key, setting.value)} className="flex items-center gap-2">
+                          <Save className="w-4 h-4" /> Save
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {settings.length === 0 && (
-                  <p className="text-muted-foreground">No settings found in the database.</p>
+                  <p className="text-muted-foreground">No settings found. Run fix_prices.sql in Supabase to seed them.</p>
                 )}
               </div>
             </div>
@@ -263,20 +292,23 @@ export default function AdminDashboard() {
         </Tabs>
       </div>
 
-      {/* Edit Material Modal */}
+      {/* Edit / Add Material Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{currentMaterial?.isNew ? 'Add New Material' : 'Edit Material'}</DialogTitle>
+            <DialogTitle>{currentMaterial?.isNew ? 'Add New Material' : `Edit — ${currentMaterial?.label}`}</DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Formula: <code className="bg-muted px-1 rounded">{currentMaterial?.type === 'SLA' ? 'Y × M/V × B' : 'Y × M/L × A'}</code>
+            </p>
           </DialogHeader>
           {currentMaterial && (
             <form onSubmit={handleSaveMaterial} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="mat-id">Material ID (Unique, No Spaces)</Label>
-                  <Input 
-                    id="mat-id" 
-                    value={currentMaterial.id} 
+                  <Label htmlFor="mat-id">Material ID (unique, no spaces)</Label>
+                  <Input
+                    id="mat-id"
+                    value={currentMaterial.id}
                     onChange={e => setCurrentMaterial({...currentMaterial, id: e.target.value})}
                     disabled={!currentMaterial.isNew}
                     required
@@ -285,63 +317,87 @@ export default function AdminDashboard() {
                 <div className="space-y-2">
                   <Label htmlFor="mat-type">Print Type</Label>
                   <Select value={currentMaterial.type} onValueChange={v => setCurrentMaterial({...currentMaterial, type: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="FDM">FDM</SelectItem>
                       <SelectItem value="SLA">SLA</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="mat-label">Display Name</Label>
-                  <Input 
-                    id="mat-label" 
-                    value={currentMaterial.label} 
+                  <Input
+                    id="mat-label"
+                    value={currentMaterial.label}
                     onChange={e => setCurrentMaterial({...currentMaterial, label: e.target.value})}
                     required
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="mat-price-label">Description / Sub-label</Label>
-                  <Input 
-                    id="mat-price-label" 
-                    value={currentMaterial.price_label} 
+                  <Input
+                    id="mat-price-label"
+                    value={currentMaterial.price_label}
                     onChange={e => setCurrentMaterial({...currentMaterial, price_label: e.target.value})}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="mat-density">Density (g/cm³)</Label>
-                  <Input 
-                    id="mat-density" 
-                    type="number" 
-                    step="0.01"
-                    value={currentMaterial.density_gcm3} 
-                    onChange={e => setCurrentMaterial({...currentMaterial, density_gcm3: Number(e.target.value)})}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="mat-cost">Cost Per Gram ($)</Label>
-                  <Input 
-                    id="mat-cost" 
-                    type="number" 
-                    step="0.001"
-                    value={currentMaterial.cost_per_gram} 
-                    onChange={e => setCurrentMaterial({...currentMaterial, cost_per_gram: Number(e.target.value)})}
-                    required
                   />
                 </div>
               </div>
 
+              {/* Botzen Formula Variables */}
+              <div className="border border-border rounded-lg p-4 space-y-4 bg-muted/30">
+                <h3 className="text-sm font-semibold text-foreground">Botzen Formula Variables</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mat-spool-cost">M — Spool / Bottle Cost ($)</Label>
+                    <p className="text-xs text-muted-foreground">Total purchase price of the spool or resin bottle</p>
+                    <Input
+                      id="mat-spool-cost"
+                      type="number"
+                      step="0.01"
+                      value={currentMaterial.spool_cost ?? 0}
+                      onChange={e => setCurrentMaterial({...currentMaterial, spool_cost: Number(e.target.value)})}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mat-spool-qty">
+                      {currentMaterial.type === 'SLA' ? 'V — Bottle Volume (mL)' : 'L — Spool Length (meters)'}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {currentMaterial.type === 'SLA'
+                        ? 'Total resin volume in the bottle (e.g. 1000 for 1L)'
+                        : 'Total filament length on the spool (e.g. 335m for 1kg PLA)'}
+                    </p>
+                    <Input
+                      id="mat-spool-qty"
+                      type="number"
+                      step="1"
+                      value={currentMaterial.spool_quantity ?? 0}
+                      onChange={e => setCurrentMaterial({...currentMaterial, spool_quantity: Number(e.target.value)})}
+                      required
+                    />
+                  </div>
+                </div>
+                {/* Live unit rate preview */}
+                {currentMaterial.spool_quantity > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Unit rate (M/{currentMaterial.type === 'SLA' ? 'V' : 'L'}):{' '}
+                    <strong className="text-foreground">
+                      ${(Number(currentMaterial.spool_cost) / Number(currentMaterial.spool_quantity)).toFixed(5)}
+                      /{currentMaterial.type === 'SLA' ? 'mL' : 'm'}
+                    </strong>
+                  </p>
+                )}
+              </div>
+
+
+
               <div className="space-y-2 pt-2">
-                <Label htmlFor="mat-colors">Available Colors (Comma Separated)</Label>
-                <Input 
-                  id="mat-colors" 
-                  value={Array.isArray(currentMaterial.colors) ? currentMaterial.colors.join(', ') : ''} 
+                <Label htmlFor="mat-colors">Available Colors (comma separated)</Label>
+                <Input
+                  id="mat-colors"
+                  value={Array.isArray(currentMaterial.colors) ? currentMaterial.colors.join(', ') : ''}
                   onChange={e => {
                     const colors = e.target.value.split(',').map(c => c.trim()).filter(c => c);
                     setCurrentMaterial({...currentMaterial, colors});
