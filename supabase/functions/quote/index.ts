@@ -1275,6 +1275,14 @@ export class PricingService {
       printabilityGrade: geometry.printability.grade,
       printabilityScore: geometry.printability.score,
       volumeBreakdown: { modelMl, supportsMl, raftMl, totalMl },
+      weightBreakdown: {
+        modelGrams: +estimation.weightGrams.toFixed(2),
+        supportsGrams: +estimation.supportWeightGrams.toFixed(2),
+        raftGrams: +estimation.raftWeightGrams.toFixed(2),
+        totalGrams: +estimation.totalWeightGrams.toFixed(2),
+      },
+      filamentLengthM: +estimation.filamentLengthM.toFixed(2),
+      isSLA,
       costBreakdown: {
         modelCost: +modelCost.toFixed(2),
         supportRaftCost: +supportRaftCost.toFixed(2),

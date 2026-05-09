@@ -37,6 +37,14 @@ export interface QuoteResult {
     raftMl: number;
     totalMl: number;
   };
+  weightBreakdown?: {
+    modelGrams: number;
+    supportsGrams: number;
+    raftGrams: number;
+    totalGrams: number;
+  };
+  filamentLengthM?: number;
+  isSLA?: boolean;
   costBreakdown?: {
     modelCost: number;
     supportRaftCost: number;

@@ -115,13 +115,29 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
   if (!quote) return null;
 
   // ── Computed values ──────────────────────────────────────────────────────────
+  const isSLA = quote.isSLA ?? printType === 'SLA';
   const vol = quote.volumeBreakdown;
+  const wt = quote.weightBreakdown;
   const cost = quote.costBreakdown;
-  const totalMl   = vol ? vol.totalMl : (modelStats ? parseVolumeMl(modelStats.volume) : null);
-  const modelMl   = vol ? `${vol.modelMl} mL` : (totalMl !== null ? `${totalMl.toFixed(2)} mL` : '—');
-  const suppMl    = vol ? `${vol.supportsMl} mL` : '0 mL';
-  const raftMl    = vol ? `${vol.raftMl} mL` : '0 mL';
-  const layers    = modelStats ? estimateLayers(modelStats.dimensions, printType) : null;
+
+  const materialUnit = isSLA ? 'mL' : 'g';
+  const totalMaterial = isSLA 
+    ? (vol ? vol.totalMl : (modelStats ? parseVolumeMl(modelStats.volume) : null))
+    : (wt ? wt.totalGrams : null);
+
+  const modelAmount = isSLA 
+    ? (vol ? `${vol.modelMl} mL` : (totalMaterial !== null ? `${totalMaterial.toFixed(2)} mL` : '—'))
+    : (wt ? `${wt.modelGrams} g` : '—');
+
+  const suppAmount = isSLA 
+    ? (vol ? `${vol.supportsMl} mL` : '0 mL')
+    : (wt ? `${wt.supportsGrams} g` : '0 g');
+
+  const raftAmount = isSLA 
+    ? (vol ? `${vol.raftMl} mL` : '0 mL')
+    : (wt ? `${wt.raftGrams} g` : '0 g');
+
+  const layers    = modelStats ? estimateLayers(modelStats.dimensions, isSLA ? 'SLA' : 'FDM') : null;
   const printTime = quote.display.printTime;
   const score     = quote.printabilityScore;
   const scoreColor = score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
@@ -155,30 +171,36 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
             </div>
           </div>
 
-          {/* Volume Block */}
+          {/* Material Block */}
           <div className="flex justify-between items-center text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Droplets className="w-4 h-4" />
-              <span>Volume</span>
+              <span>{isSLA ? 'Volume' : 'Material Weight'}</span>
             </div>
             <div className="font-medium text-foreground flex items-center gap-1">
-              {totalMl !== null ? `${totalMl.toFixed(2)} mL` : '—'} <ChevronDown className="w-4 h-4" />
+              {totalMaterial !== null ? `${totalMaterial.toFixed(2)} ${materialUnit}` : '—'} <ChevronDown className="w-4 h-4" />
             </div>
           </div>
           
           <div className="pl-6 border-l-[1.5px] border-border ml-[7px] space-y-1.5 mt-2">
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Model(s)</span>
-              <span className="text-foreground">{modelMl}</span>
+              <span className="text-foreground">{modelAmount}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Supports</span>
-              <span className="text-foreground">{suppMl}</span>
+              <span className="text-foreground">{suppAmount}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Raft</span>
-              <span className="text-foreground">{raftMl}</span>
+              <span className="text-muted-foreground">{isSLA ? 'Raft' : 'Raft / Skirt'}</span>
+              <span className="text-foreground">{raftAmount}</span>
             </div>
+            {!isSLA && quote.filamentLengthM && (
+              <div className="flex justify-between items-center text-sm pt-1 border-t border-border/50">
+                <span className="text-muted-foreground">Filament Used</span>
+                <span className="text-foreground">{quote.filamentLengthM.toFixed(2)} m</span>
+              </div>
+            )}
           </div>
 
           {/* Cost Block */}
@@ -204,16 +226,18 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
             </div>
           </div>
 
-          {/* Touchpoints */}
-          <div className="flex justify-between items-center text-sm pt-2">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Wand2 className="w-4 h-4" />
-              <span>Touchpoints</span>
+          {/* Touchpoints (SLA Only) */}
+          {isSLA && (
+            <div className="flex justify-between items-center text-sm pt-2">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Wand2 className="w-4 h-4" />
+                <span>Touchpoints</span>
+              </div>
+              <div className="font-medium text-foreground">
+                {touchpoints}
+              </div>
             </div>
-            <div className="font-medium text-foreground">
-              {touchpoints}
-            </div>
-          </div>
+          )}
 
           {/* Layers */}
           <div className="flex justify-between items-center text-sm">
