@@ -19,10 +19,10 @@ const PRESET_MODELS: Record<string, string> = {
 };
 
 const DEFAULT_STATS = {
-  dimensions: "103mm x 54mm x 75mm",
-  volume: "153cm³",
-  surface: "207cm²",
-  weight: "55g",
+  dimensions: "103.00mm x 54.00mm x 75.00mm",
+  volume: "153.00cm³",
+  surface: "207.00cm²",
+  weight: "55.00g",
 };
 
 export default function Index() {

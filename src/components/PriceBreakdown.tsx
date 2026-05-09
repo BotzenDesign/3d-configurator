@@ -126,16 +126,16 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
     : (wt ? wt.totalGrams : null);
 
   const modelAmount = isSLA 
-    ? (vol ? `${vol.modelMl} mL` : (totalMaterial !== null ? `${totalMaterial.toFixed(2)} mL` : '—'))
-    : (wt ? `${wt.modelGrams} g` : '—');
+    ? (vol ? `${vol.modelMl.toFixed(2)} mL` : (totalMaterial !== null ? `${totalMaterial.toFixed(2)} mL` : '—'))
+    : (wt ? `${wt.modelGrams.toFixed(2)} g` : '—');
 
   const suppAmount = isSLA 
-    ? (vol ? `${vol.supportsMl} mL` : '0 mL')
-    : (wt ? `${wt.supportsGrams} g` : '0 g');
+    ? (vol ? `${vol.supportsMl.toFixed(2)} mL` : '0.00 mL')
+    : (wt ? `${wt.supportsGrams.toFixed(2)} g` : '0.00 g');
 
   const raftAmount = isSLA 
-    ? (vol ? `${vol.raftMl} mL` : '0 mL')
-    : (wt ? `${wt.raftGrams} g` : '0 g');
+    ? (vol ? `${vol.raftMl.toFixed(2)} mL` : '0.00 mL')
+    : (wt ? `${wt.raftGrams.toFixed(2)} g` : '0.00 g');
 
   const layers    = modelStats ? estimateLayers(modelStats.dimensions, isSLA ? 'SLA' : 'FDM') : null;
   const printTime = quote.display.printTime;

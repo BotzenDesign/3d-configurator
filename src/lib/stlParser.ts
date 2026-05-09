@@ -102,9 +102,9 @@ export function computeStats(geometry: THREE.BufferGeometry) {
   const weight = (volume / 1000) * density;
 
   return {
-    dimensions: `${size.x.toFixed(0)}mm x ${size.y.toFixed(0)}mm x ${size.z.toFixed(0)}mm`,
-    volume: `${(volume / 1000).toFixed(1)}cm³`,
-    surface: `${(surfaceArea / 100).toFixed(1)}cm²`,
-    weight: `${weight.toFixed(1)}g`,
+    dimensions: `${size.x.toFixed(2)}mm x ${size.y.toFixed(2)}mm x ${size.z.toFixed(2)}mm`,
+    volume: `${(volume / 1000).toFixed(2)}cm³`,
+    surface: `${(surfaceArea / 100).toFixed(2)}cm²`,
+    weight: `${weight.toFixed(2)}g`,
   };
 }
