@@ -72,7 +72,12 @@ END $$;
 INSERT INTO public.app_settings (key, value, description) VALUES
   ('material_multiplier_Y', '2.0'::jsonb,   'Y — Material cost multiplier. 2× means price = 2 × (M/L × A). Configurable per client.'),
   ('run_time_multiplier_W', '1.25'::jsonb,  'W — Fixed run-time multiplier in $/hr. Charged per hour of machine print time.'),
-  ('max_file_size_mb',      '100'::jsonb,   'Maximum upload file size in megabytes.')
+  ('max_file_size_mb',      '100'::jsonb,   'Maximum upload file size in megabytes.'),
+  ('supports_enabled',      'true'::jsonb,  'Globally enable support generation calculations.'),
+  ('support_density',       '0.15'::jsonb,  'Fraction of support volume to solid volume (e.g. 0.15 = 15%).'),
+  ('raft_enabled',          'false'::jsonb, 'Globally enable raft calculation for FDM parts.'),
+  ('raft_layers',           '3'::jsonb,     'Number of layers to generate for the raft.'),
+  ('layer_height_fdm',      '0.2'::jsonb,   'Default FDM layer height in mm.')
 ON CONFLICT (key) DO UPDATE SET
   value       = EXCLUDED.value,
   description = EXCLUDED.description;

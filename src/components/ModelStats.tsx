@@ -37,17 +37,17 @@ const StatRow = ({
     </div>
     <div className="flex-1 min-w-0">
       <div className="text-[10px] text-muted-foreground/60 leading-none mb-0.5">{label}</div>
-      <div className="text-xs font-medium text-foreground/90 truncate">{value}</div>
+      <div className="text-xs font-medium text-foreground/90 break-words">{value}</div>
     </div>
   </div>
 );
 
 export default function ModelStats({ dimensions, volume, surface, weight, modelName }: ModelStatsProps) {
   return (
-    <div className="absolute top-4 right-4 z-10 w-[180px]">
+    <div className="absolute top-4 right-4 z-10 min-w-[190px] max-w-[240px]">
       <div className="bg-background/70 backdrop-blur-xl border border-border/50 rounded-xl p-3 space-y-2.5 shadow-lg">
         {modelName && (
-          <div className="text-[10px] font-semibold text-primary tracking-wide uppercase truncate pb-1 border-b border-border/30">
+          <div className="text-[10px] font-semibold text-primary tracking-wide uppercase break-all pb-1 border-b border-border/30">
             {modelName}
           </div>
         )}

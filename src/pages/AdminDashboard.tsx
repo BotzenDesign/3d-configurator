@@ -159,7 +159,6 @@ export default function AdminDashboard() {
                   label: '',
                   price_label: '',
                   type: 'FDM',
-                  density_gcm3: 1.24,
                   cost_per_gram: 0.035,
                   spool_cost: 35,
                   spool_quantity: 335,

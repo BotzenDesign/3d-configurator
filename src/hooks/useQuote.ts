@@ -31,6 +31,12 @@ export interface QuoteResult {
   needsRepair: boolean;
   printabilityGrade: 'EXCELLENT' | 'GOOD' | 'WARNING' | 'FAIL';
   printabilityScore: number;
+  volumeBreakdown?: {
+    modelMl: number;
+    supportsMl: number;
+    raftMl: number;
+    totalMl: number;
+  };
 }
 
 export interface UseQuoteOptions {

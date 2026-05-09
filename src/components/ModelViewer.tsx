@@ -31,6 +31,7 @@ interface ModelViewerProps {
   color: string;
   geometry: THREE.BufferGeometry | null;
   printType?: "FDM" | "SLA";
+  realDimensions?: string; // e.g. "102mm x 152mm x 155mm" from STL parser
 }
 
 // ── Build Volume Constants ───────────────────────────────────────────────
@@ -179,6 +180,7 @@ function UploadedModel({
   wireframe,
   maxPolygons,
   orientation,
+  tilt,
   onBoundsComputed,
 }: {
   geometry: THREE.BufferGeometry;
@@ -186,6 +188,7 @@ function UploadedModel({
   wireframe: boolean;
   maxPolygons: number;
   orientation: "portrait" | "landscape";
+  tilt: "upright" | "laydown";
   onBoundsComputed: (box: THREE.Box3) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -224,8 +227,17 @@ function UploadedModel({
       g.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
     }
 
+    // Tilt: laydown = rotate 90° around X axis (lies flat on print bed)
+    if (tilt === "laydown") {
+      g.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+      // Re-seat on bed: shift down so bottom face touches Y=0
+      g.computeBoundingBox();
+      const tiltedBox = g.boundingBox!;
+      g.translate(0, -tiltedBox.min.y, 0);
+    }
+
     return g;
-  }, [geometry, maxPolygons, orientation]);
+  }, [geometry, maxPolygons, orientation, tilt]);
 
   useEffect(() => {
     if (meshRef.current) {
@@ -254,11 +266,11 @@ function ViewerToolbar({
   onToggleDimensions,
   showWireframe,
   onToggleWireframe,
-  showPerf,
-  onTogglePerf,
-  onResetCamera,
   orientation,
   onToggleOrientation,
+  tilt,
+  onToggleTilt,
+  onResetCamera,
   isMobile,
   lowPowerMode,
 }: {
@@ -266,11 +278,11 @@ function ViewerToolbar({
   onToggleDimensions: () => void;
   showWireframe: boolean;
   onToggleWireframe: () => void;
-  showPerf: boolean;
-  onTogglePerf: () => void;
-  onResetCamera: () => void;
   orientation: "portrait" | "landscape";
   onToggleOrientation: () => void;
+  tilt: "upright" | "laydown";
+  onToggleTilt: () => void;
+  onResetCamera: () => void;
   isMobile: boolean;
   lowPowerMode: boolean;
 }) {
@@ -290,6 +302,7 @@ function ViewerToolbar({
       <button className={btnClass(showWireframe)} onClick={onToggleWireframe} title="Toggle wireframe">
         🔲
       </button>
+      {/* Portrait / Landscape */}
       <button
         className={btnClass(orientation === "landscape")}
         onClick={onToggleOrientation}
@@ -297,8 +310,13 @@ function ViewerToolbar({
       >
         {orientation === "portrait" ? "🔄" : "↩️"}
       </button>
-      <button className={btnClass(showPerf)} onClick={onTogglePerf} title="Performance monitor">
-        📊
+      {/* Stand up / Lay down */}
+      <button
+        className={btnClass(tilt === "laydown")}
+        onClick={onToggleTilt}
+        title={tilt === "upright" ? "Lay object flat on bed" : "Stand object upright"}
+      >
+        {tilt === "upright" ? "⬇️" : "⬆️"}
       </button>
       <button className={btnClass(false)} onClick={onResetCamera} title="Reset camera">
         🎯
@@ -313,12 +331,12 @@ function ViewerToolbar({
 }
 
 // ── Main Viewer ──────────────────────────────────────────────────────────
-export default function ModelViewer({ modelType, color, geometry, printType = "FDM" }: ModelViewerProps) {
+export default function ModelViewer({ modelType, color, geometry, printType = "FDM", realDimensions }: ModelViewerProps) {
   const device = useDeviceCapabilities();
   const [showDimensions, setShowDimensions] = useState(!device.isMobile);
   const [showWireframe, setShowWireframe] = useState(false);
-  const [showPerf, setShowPerf] = useState(false);
   const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
+  const [tilt, setTilt] = useState<"upright" | "laydown">("upright");
   const [modelBounds, setModelBounds] = useState<THREE.Box3 | null>(null);
   const [cameraResetKey, setCameraResetKey] = useState(0);
   const [sceneReady, setSceneReady] = useState(false);
@@ -347,11 +365,11 @@ export default function ModelViewer({ modelType, color, geometry, printType = "F
           onToggleDimensions={() => setShowDimensions((v) => !v)}
           showWireframe={showWireframe}
           onToggleWireframe={() => setShowWireframe((v) => !v)}
-          showPerf={showPerf}
-          onTogglePerf={() => setShowPerf((v) => !v)}
-          onResetCamera={handleResetCamera}
           orientation={orientation}
           onToggleOrientation={() => setOrientation(o => o === "portrait" ? "landscape" : "portrait")}
+          tilt={tilt}
+          onToggleTilt={() => setTilt(t => t === "upright" ? "laydown" : "upright")}
+          onResetCamera={handleResetCamera}
           isMobile={device.isMobile}
           lowPowerMode={device.lowPowerMode}
         />
@@ -439,6 +457,7 @@ export default function ModelViewer({ modelType, color, geometry, printType = "F
                 wireframe={showWireframe}
                 maxPolygons={device.maxPolygons}
                 orientation={orientation}
+                tilt={tilt}
                 onBoundsComputed={handleBoundsComputed}
               />
             ) : (
@@ -452,14 +471,13 @@ export default function ModelViewer({ modelType, color, geometry, printType = "F
 
             {/* Dimension overlays — hidden on mobile by default */}
             {modelBounds && !device.isMobile && (
-              <DimensionOverlay boundingBox={modelBounds} visible={showDimensions} />
+              <DimensionOverlay boundingBox={modelBounds} visible={showDimensions} realDimensions={realDimensions} />
             )}
             {modelBounds && device.isMobile && showDimensions && (
-              <DimensionOverlay boundingBox={modelBounds} visible={true} />
+              <DimensionOverlay boundingBox={modelBounds} visible={true} realDimensions={realDimensions} />
             )}
 
             <AutoFitCamera key={cameraResetKey} boundingBox={modelBounds} />
-            <PerformanceMonitor visible={showPerf} />
             <SceneReady key={modelType + (geometry ? geometry.uuid : '')} onReady={() => setSceneReady(true)} />
 
             {/* Battery saver — throttle when idle */}

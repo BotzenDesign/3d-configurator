@@ -139,6 +139,7 @@ export default function Index() {
                 color={color}
                 geometry={uploadedGeometry}
                 printType={printType}
+                realDimensions={stats.dimensions}
               />
               <ModelStats {...stats} modelName={modelName} />
               <ModelSelector
@@ -203,6 +204,7 @@ export default function Index() {
             color={color}
             geometry={uploadedGeometry}
             printType={printType}
+            realDimensions={stats.dimensions}
           />
           <ModelStats {...stats} modelName={modelName} />
           <ModelSelector

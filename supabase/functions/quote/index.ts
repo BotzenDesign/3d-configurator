@@ -999,6 +999,13 @@ export interface QuoteResult {
   printabilityGrade: string;
   /** Printability score 0-100 */
   printabilityScore: number;
+  /** Volume breakdown in mL for the Summary panel */
+  volumeBreakdown: {
+    modelMl: number;
+    supportsMl: number;
+    raftMl: number;
+    totalMl: number;
+  };
 }
 
 // ── Pricing Engine ────────────────────────────────────────────────────────────
@@ -1100,6 +1107,21 @@ export class PricingService {
     const needsRepair = !geometry.quality.isManifold &&
       (geometry.quality.nonManifoldEdges > 0 || geometry.quality.boundaryEdges > 5);
 
+    // ── Volume breakdown (in mL, 1 cm³ = 1 mL) ───────────────────────────────
+    const modelMl    = +estimation.effectiveVolumeCm3.toFixed(2);
+    const supportsMl = +estimation.supportWeightGrams > 0
+      ? +(estimation.supportWeightGrams / estimation.material.densityGcm3).toFixed(2)
+      : 0;
+    // Raft: footprint area (X*Z mm²) × raft thickness (raftLayers × layerHeight mm) / 1000 → mL
+    const raftEnabled   = (this.config as any).raftEnabled ?? false;
+    const raftLayers    = (this.config as any).raftLayers  ?? 3;
+    const layerHeightMm = (this.config as any).layerHeightMm ?? (isSLA ? 0.1 : 0.2);
+    const bbox = geometry.boundingBox.size;
+    const raftMl = raftEnabled && !isSLA
+      ? +((bbox.x * bbox.y * raftLayers * layerHeightMm) / 1000).toFixed(2)
+      : 0;
+    const totalMl = +(modelMl + supportsMl + raftMl).toFixed(2);
+
     return {
       lineItems,
       unitPriceUsd: +unitPriceUsd.toFixed(2),
@@ -1121,6 +1143,7 @@ export class PricingService {
       needsRepair,
       printabilityGrade: geometry.printability.grade,
       printabilityScore: geometry.printability.score,
+      volumeBreakdown: { modelMl, supportsMl, raftMl, totalMl },
     };
   }
 
@@ -1189,7 +1212,7 @@ serve(async (req) => {
       acc[mat.id] = {
         id:              mat.id,
         name:            mat.label,
-        densityGcm3:     Number(mat.density_gcm3),
+        densityGcm3:     Number(mat.density_gcm3 || (isSLA ? 1.1 : 1.24)),
         costPerGram:     Number(mat.cost_per_gram),      // legacy fallback
         spoolCost:       Number(mat.spool_cost ?? mat.cost_per_gram * (isSLA ? 1000 : 335)), // M
         spoolQuantity:   Number(mat.spool_quantity ?? (isSLA ? 1000 : 335)), // L (m) or V (mL)
@@ -1210,7 +1233,11 @@ serve(async (req) => {
     pricingService.setConfig({
       materialMultiplierY: Number(settingsMap.material_multiplier_Y ?? 2.0),
       runTimeMultiplierW:  Number(settingsMap.run_time_multiplier_W ?? 1.25),
-    });
+      // Support & raft settings
+      raftEnabled:   Boolean(settingsMap.raft_enabled ?? false),
+      raftLayers:    Number(settingsMap.raft_layers  ?? 3),
+      layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2),
+    } as any);
     
     // Also update FileValidationService dynamic max file size if present
     if (settingsMap.max_file_size_mb) {
@@ -1259,7 +1286,9 @@ serve(async (req) => {
         shellCount: 2,
         topBottomLayers: 4,
       },
-      needsSupport: false, 
+      needsSupport: Boolean(settingsMap.supports_enabled ?? true),
+      supportFraction: Number(settingsMap.support_density ?? 0.15),
+      layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2), 
     });
 
     // 4. Final Pricing Quote

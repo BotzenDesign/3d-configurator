@@ -14,6 +14,7 @@ import * as THREE from "three";
 interface DimensionOverlayProps {
   boundingBox: THREE.Box3;
   visible?: boolean;
+  realDimensions?: string; // "WxHxD" string from STL parser, e.g. "102mm x 152mm x 155mm"
 }
 
 function DimensionLabel({
@@ -89,7 +90,7 @@ function DimensionLine({
   );
 }
 
-export default function DimensionOverlay({ boundingBox, visible = true }: DimensionOverlayProps) {
+export default function DimensionOverlay({ boundingBox, visible = true, realDimensions }: DimensionOverlayProps) {
   const dimensions = useMemo(() => {
     if (!boundingBox || boundingBox.isEmpty()) return null;
 
@@ -98,47 +99,49 @@ export default function DimensionOverlay({ boundingBox, visible = true }: Dimens
     const size = new THREE.Vector3();
     boundingBox.getSize(size);
 
-    const offset = 8; // Distance of dimension lines from model
+    // Parse real dimensions from STL parser if provided
+    // Format: "102mm x 152mm x 155mm"  →  [W, H, D]
+    let realW: number | null = null;
+    let realH: number | null = null;
+    let realD: number | null = null;
+    if (realDimensions) {
+      const parts = realDimensions.replace(/mm/gi, '').split(/\s*x\s*/i);
+      if (parts.length === 3) {
+        realW = parseFloat(parts[0]);
+        realH = parseFloat(parts[1]);
+        realD = parseFloat(parts[2]);
+      }
+    }
+
+    const fmt = (real: number | null, scaled: number) =>
+      real !== null ? `${real.toFixed(0)}mm` : `${scaled.toFixed(1)}mm`;
+
+    const offset = 8;
 
     return {
-      // X axis (width) — along the bottom front edge
       x: {
         start: new THREE.Vector3(min.x, min.y - offset, max.z + offset),
-        end: new THREE.Vector3(max.x, min.y - offset, max.z + offset),
-        label: `${size.x.toFixed(1)}mm`,
-        labelPos: [
-          (min.x + max.x) / 2,
-          min.y - offset - 3,
-          max.z + offset,
-        ] as [number, number, number],
-        color: "#ef4444", // Red
+        end:   new THREE.Vector3(max.x, min.y - offset, max.z + offset),
+        label: fmt(realW, size.x),
+        labelPos: [(min.x + max.x) / 2, min.y - offset - 3, max.z + offset] as [number, number, number],
+        color: "#ef4444",
       },
-      // Y axis (height) — along the left side
       y: {
         start: new THREE.Vector3(min.x - offset, min.y, max.z + offset),
-        end: new THREE.Vector3(min.x - offset, max.y, max.z + offset),
-        label: `${size.y.toFixed(1)}mm`,
-        labelPos: [
-          min.x - offset - 3,
-          (min.y + max.y) / 2,
-          max.z + offset,
-        ] as [number, number, number],
-        color: "#22c55e", // Green
+        end:   new THREE.Vector3(min.x - offset, max.y, max.z + offset),
+        label: fmt(realH, size.y),
+        labelPos: [min.x - offset - 3, (min.y + max.y) / 2, max.z + offset] as [number, number, number],
+        color: "#22c55e",
       },
-      // Z axis (depth) — along the bottom right edge
       z: {
         start: new THREE.Vector3(max.x + offset, min.y - offset, min.z),
-        end: new THREE.Vector3(max.x + offset, min.y - offset, max.z),
-        label: `${size.z.toFixed(1)}mm`,
-        labelPos: [
-          max.x + offset + 3,
-          min.y - offset - 3,
-          (min.z + max.z) / 2,
-        ] as [number, number, number],
-        color: "#3b82f6", // Blue
+        end:   new THREE.Vector3(max.x + offset, min.y - offset, max.z),
+        label: fmt(realD, size.z),
+        labelPos: [max.x + offset + 3, min.y - offset - 3, (min.z + max.z) / 2] as [number, number, number],
+        color: "#3b82f6",
       },
     };
-  }, [boundingBox]);
+  }, [boundingBox, realDimensions]);
 
   if (!visible || !dimensions) return null;
 

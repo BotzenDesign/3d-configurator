@@ -263,28 +263,30 @@ export default function ConfigPanel({
               >
                 {materials.map((m, i) => (
                   <option key={i} value={i} className="bg-secondary text-foreground">
-                    {m.label} — {m.price}
+                    {m.label}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Color — only colors available for this material */}
-            <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
-              <select
-                value={colorIdx}
-                onChange={(e) => handleColorSelect(+e.target.value)}
-                className="bg-transparent text-config-label text-sm font-medium appearance-none cursor-pointer outline-none flex-1"
-              >
-                {availableColors.map((c: string, i: number) => (
-                  <option key={i} value={i} className="bg-secondary text-foreground">{c}</option>
-                ))}
-              </select>
-              <div
-                className="w-5 h-5 rounded-full border-2 border-border ml-2 flex-shrink-0"
-                style={{ backgroundColor: COLOR_HEX[availableColors[colorIdx]] ?? "#888" }}
-              />
-            </div>
+            {/* Color — only shown for FDM; SLA resins define their own color */}
+            {printType === "FDM" && (
+              <div className="bg-secondary rounded-lg flex items-center justify-between px-4 py-3">
+                <select
+                  value={colorIdx}
+                  onChange={(e) => handleColorSelect(+e.target.value)}
+                  className="bg-transparent text-config-label text-sm font-medium appearance-none cursor-pointer outline-none flex-1"
+                >
+                  {availableColors.map((c: string, i: number) => (
+                    <option key={i} value={i} className="bg-secondary text-foreground">{c}</option>
+                  ))}
+                </select>
+                <div
+                  className="w-5 h-5 rounded-full border-2 border-border ml-2 flex-shrink-0"
+                  style={{ backgroundColor: COLOR_HEX[availableColors[colorIdx]] ?? "#888" }}
+                />
+              </div>
+            )}
           </>
         )}
 
@@ -329,12 +331,14 @@ export default function ConfigPanel({
           </div>
         </div>
 
-        {/* Price breakdown */}
+        {/* Summary */}
         <PriceBreakdown
           quote={quote}
           isLoading={isQuoteLoading}
           error={quoteError}
           hasFile={!!activeFile}
+          modelStats={modelStats}
+          printType={printType}
         />
       </div>
 
