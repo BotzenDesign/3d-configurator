@@ -1370,7 +1370,7 @@ serve(async (req) => {
       materialMultiplierY: Number(settingsMap.material_multiplier_Y ?? 2.0),
       runTimeMultiplierW:  Number(settingsMap.run_time_multiplier_W ?? 1.25),
       // Support & raft settings
-      raftEnabled:   Boolean(settingsMap.raft_enabled ?? false),
+      raftEnabled:   settingsMap.raft_enabled === "false" ? false : true,
       raftLayers:    Number(settingsMap.raft_layers  ?? 3),
       layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2),
     } as any);
@@ -1422,10 +1422,10 @@ serve(async (req) => {
         shellCount: 2,
         topBottomLayers: 4,
       },
-      needsSupport: Boolean(settingsMap.supports_enabled ?? true),
+      needsSupport: settingsMap.supports_enabled === "false" ? false : true,
       supportFraction: Number(settingsMap.support_density ?? 0.15),
       layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2), 
-      raftEnabled: Boolean(settingsMap.raft_enabled ?? false),
+      raftEnabled: settingsMap.raft_enabled === "false" ? false : true,
       raftLayers: Number(settingsMap.raft_layers ?? 3),
     });
 
