@@ -37,6 +37,11 @@ export interface QuoteResult {
     raftMl: number;
     totalMl: number;
   };
+  costBreakdown?: {
+    modelCost: number;
+    supportRaftCost: number;
+    totalMaterialCost: number;
+  };
 }
 
 export interface UseQuoteOptions {

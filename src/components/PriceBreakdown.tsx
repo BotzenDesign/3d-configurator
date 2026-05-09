@@ -2,7 +2,7 @@
  * PriceBreakdown — Slicer-style Summary Panel
  * Matches the layout of professional slicers (Formlabs, Bambu, Prusa).
  */
-import { Loader2, AlertTriangle, Clock, Droplets, DollarSign, Layers, Zap, Info } from 'lucide-react';
+import { Loader2, AlertTriangle, Clock, Droplets, DollarSign, Layers, Info, ChevronDown, Wand2, RefreshCcw } from 'lucide-react';
 import type { QuoteResult } from '@/hooks/useQuote';
 
 interface ModelStats {
@@ -116,80 +116,130 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
 
   // ── Computed values ──────────────────────────────────────────────────────────
   const vol = quote.volumeBreakdown;
+  const cost = quote.costBreakdown;
   const totalMl   = vol ? vol.totalMl : (modelStats ? parseVolumeMl(modelStats.volume) : null);
   const modelMl   = vol ? `${vol.modelMl} mL` : (totalMl !== null ? `${totalMl.toFixed(2)} mL` : '—');
   const suppMl    = vol ? `${vol.supportsMl} mL` : '0 mL';
   const raftMl    = vol ? `${vol.raftMl} mL` : '0 mL';
   const layers    = modelStats ? estimateLayers(modelStats.dimensions, printType) : null;
-  const filament  = extractFilamentLength(quote);
-  const weight    = quote.display.weight;
   const printTime = quote.display.printTime;
   const score     = quote.printabilityScore;
   const scoreColor = score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
 
+  const totalCost = cost ? cost.totalMaterialCost.toFixed(2) : '0.00';
+  const modelCost = cost ? cost.modelCost.toFixed(2) : '0.00';
+  const supportRaftCost = cost ? cost.supportRaftCost.toFixed(2) : '0.00';
+  const touchpoints = 470; // Hardcoded touchpoints visual for now
+
   return (
     <div style={s.card}>
+      <div className="p-4 space-y-4">
+        {/* Header */}
+        <div className="flex justify-between items-center pb-2 border-b border-border">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-lg text-foreground">Summary</h3>
+            <Info className="w-4 h-4 text-muted-foreground" />
+          </div>
+        </div>
 
-      {/* Header */}
-      <div style={s.header}>
-        <span style={s.headerTitle}>Summary</span>
-        <Info size={13} color="rgba(255,255,255,0.3)" />
+        <div className="space-y-3">
+          {/* Time Estimate */}
+          <div className="flex justify-between items-center text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="w-4 h-4" />
+              <span>Time Estimate</span>
+              <Info className="w-4 h-4" />
+            </div>
+            <div className="font-medium text-foreground flex items-center gap-2">
+              {printTime} <RefreshCcw className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          {/* Volume Block */}
+          <div className="flex justify-between items-center text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Droplets className="w-4 h-4" />
+              <span>Volume</span>
+            </div>
+            <div className="font-medium text-foreground flex items-center gap-1">
+              {totalMl !== null ? `${totalMl.toFixed(2)} mL` : '—'} <ChevronDown className="w-4 h-4" />
+            </div>
+          </div>
+          
+          <div className="pl-6 border-l-[1.5px] border-border ml-[7px] space-y-1.5 mt-2">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Model(s)</span>
+              <span className="text-foreground">{modelMl}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Supports</span>
+              <span className="text-foreground">{suppMl}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Raft</span>
+              <span className="text-foreground">{raftMl}</span>
+            </div>
+          </div>
+
+          {/* Cost Block */}
+          <div className="flex justify-between items-center text-sm pt-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <DollarSign className="w-4 h-4" />
+              <span>Total Print Cost</span>
+              <Info className="w-4 h-4" />
+            </div>
+            <div className="font-medium text-blue-500 flex items-center gap-1">
+              {totalCost} <ChevronDown className="w-4 h-4" />
+            </div>
+          </div>
+          
+          <div className="pl-6 border-l-[1.5px] border-border ml-[7px] space-y-1.5 mt-2">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Model Cost</span>
+              <span className="text-blue-500">{modelCost}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Support & Raft Cost</span>
+              <span className="text-blue-500">{supportRaftCost}</span>
+            </div>
+          </div>
+
+          {/* Touchpoints */}
+          <div className="flex justify-between items-center text-sm pt-2">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Wand2 className="w-4 h-4" />
+              <span>Touchpoints</span>
+            </div>
+            <div className="font-medium text-foreground">
+              {touchpoints}
+            </div>
+          </div>
+
+          {/* Layers */}
+          <div className="flex justify-between items-center text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Layers className="w-4 h-4" />
+              <span>Layers</span>
+            </div>
+            <div className="font-medium text-foreground">
+              {layers !== null ? layers.toLocaleString() : '—'}
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-4 mt-2 border-t border-border">
+          {/* Printability */}
+          <div style={s.printabilityWrap}>
+            <div style={s.printabilityTop}>
+              <span style={s.printabilityLabel}>Printability</span>
+              <span style={{ ...s.printabilityScore, color: scoreColor }}>{score}/100</span>
+            </div>
+            <div style={s.barTrack}>
+              <div style={{ ...s.barFill, width: `${score}%`, background: scoreColor }} />
+            </div>
+          </div>
+        </div>
       </div>
-
-      <Divider />
-
-      {/* Time Estimate */}
-      <SectionHeader icon={Clock} label="Time Estimate" value={printTime} color="#6366f1" />
-
-      <Divider />
-
-      {/* Volume */}
-      <SectionHeader icon={Droplets} label="Volume" value={totalMl !== null ? `${totalMl.toFixed(2)} mL` : '—'} color="#3b82f6" />
-      <SubRow label="Model(s)"  value={modelMl} />
-      <SubRow label="Supports"  value={suppMl} />
-      <SubRow label="Raft"      value={raftMl} />
-
-      <Divider />
-
-      {/* Material usage */}
-      {printType === 'FDM' && filament && (
-        <>
-          <SectionHeader icon={Zap} label="Filament" value={`${weight} · ${filament}`} color="#f59e0b" />
-          <Divider />
-        </>
-      )}
-      {printType === 'SLA' && (
-        <>
-          <SectionHeader icon={Zap} label="Resin" value={modelMl} color="#8b5cf6" />
-          <Divider />
-        </>
-      )}
-
-      {/* Touchpoints + Layers */}
-      <div style={s.metaGrid}>
-        <div style={s.metaCell}>
-          <span style={s.metaLabel}>Touchpoints</span>
-          <span style={s.metaValue}>0</span>
-        </div>
-        <div style={{ ...s.metaCell, borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={s.metaLabel}>Layers</span>
-          <span style={s.metaValue}>{layers !== null ? layers.toLocaleString() : '—'}</span>
-        </div>
-      </div>
-
-      <Divider />
-
-      {/* Printability */}
-      <div style={s.printabilityWrap}>
-        <div style={s.printabilityTop}>
-          <span style={s.printabilityLabel}>Printability</span>
-          <span style={{ ...s.printabilityScore, color: scoreColor }}>{score}/100</span>
-        </div>
-        <div style={s.barTrack}>
-          <div style={{ ...s.barFill, width: `${score}%`, background: scoreColor }} />
-        </div>
-      </div>
-
     </div>
   );
 }

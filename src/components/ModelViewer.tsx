@@ -192,14 +192,12 @@ function UploadedModel({
   onBoundsComputed: (box: THREE.Box3) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const [processedGeo, setProcessedGeo] = useState<THREE.BufferGeometry | null>(null);
 
-  const processedGeo = useMemo(() => {
+  useEffect(() => {
     let g = geometry.clone();
 
     // ── Z-up → Y-up correction ───────────────────────────────────────────
-    // Most CAD tools & slicers (Fusion 360, SolidWorks, PrusaSlicer, Bambu)
-    // export STL with Z as the "up" axis. Three.js uses Y-up, so without
-    // this rotation every imported model renders lying on its side.
     g.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
 
     // Apply LOD simplification if needed
@@ -236,7 +234,12 @@ function UploadedModel({
       g.translate(0, -tiltedBox.min.y, 0);
     }
 
-    return g;
+    setProcessedGeo(g);
+
+    // Cleanup WebGL memory when dependencies change or component unmounts
+    return () => {
+      g.dispose();
+    };
   }, [geometry, maxPolygons, orientation, tilt]);
 
   useEffect(() => {
@@ -245,6 +248,8 @@ function UploadedModel({
       onBoundsComputed(box);
     }
   }, [processedGeo, onBoundsComputed]);
+
+  if (!processedGeo) return null;
 
   return (
     <mesh ref={meshRef} geometry={processedGeo} position={[0, -0.5, 0]}>

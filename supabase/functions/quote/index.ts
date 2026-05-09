@@ -254,28 +254,94 @@ function length(v: Vec3): number {
 // ── STL Binary Parser ─────────────────────────────────────────────────────────
 
 /**
- * Extract vertex triplets from a binary STL Buffer.
- * Returns flat Float32Array: [v0x, v0y, v0z,  v1x, v1y, v1z,  v2x, v2y, v2z, ...]
+ * Extract vertex triplets from a binary STL buffer.
+ * Memory Optimized: Instead of returning a giant array, we calculate metrics inline
+ * if requested, to prevent 546 Memory Limit Exceeded errors on >50MB files.
  */
-function parseSTLVertices(buffer: Uint8Array): Float32Array {
+function analyzeBinarySTLDirect(buffer: Uint8Array) {
   const dataView = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const numTriangles = dataView.getUint32(80, true);
-  const vertices = new Float32Array(numTriangles * 9);
+  const triCount = dataView.getUint32(80, true);
+  
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let volume = 0, surface = 0;
+  let centroidX = 0, centroidY = 0, centroidZ = 0;
+
+  // We only keep a small subset of triangles for topology & wall thickness checks to save memory
+  const MAX_SAMPLES = Math.min(triCount, 30_000);
+  const sampledVerts = new Float32Array(MAX_SAMPLES * 9);
+  let vIdx = 0;
 
   let offset = 84;
-  for (let i = 0; i < numTriangles; i++) {
+  for (let i = 0; i < triCount; i++) {
     offset += 12; // skip normal
-    for (let j = 0; j < 3; j++) {
-      const base = i * 9 + j * 3;
-      vertices[base]     = dataView.getFloat32(offset, true);
-      vertices[base + 1] = dataView.getFloat32(offset + 4, true);
-      vertices[base + 2] = dataView.getFloat32(offset + 8, true);
-      offset += 12;
+    
+    const ax = dataView.getFloat32(offset, true);
+    const ay = dataView.getFloat32(offset + 4, true);
+    const az = dataView.getFloat32(offset + 8, true);
+    offset += 12;
+
+    const bx = dataView.getFloat32(offset, true);
+    const by = dataView.getFloat32(offset + 4, true);
+    const bz = dataView.getFloat32(offset + 8, true);
+    offset += 12;
+
+    const cx = dataView.getFloat32(offset, true);
+    const cy = dataView.getFloat32(offset + 4, true);
+    const cz = dataView.getFloat32(offset + 8, true);
+    offset += 14;
+
+    // Bounds
+    if (ax < minX) minX = ax; if (ax > maxX) maxX = ax;
+    if (ay < minY) minY = ay; if (ay > maxY) maxY = ay;
+    if (az < minZ) minZ = az; if (az > maxZ) maxZ = az;
+    if (bx < minX) minX = bx; if (bx > maxX) maxX = bx;
+    if (by < minY) minY = by; if (by > maxY) maxY = by;
+    if (bz < minZ) minZ = bz; if (bz > maxZ) maxZ = bz;
+    if (cx < minX) minX = cx; if (cx > maxX) maxX = cx;
+    if (cy < minY) minY = cy; if (cy > maxY) maxY = cy;
+    if (cz < minZ) minZ = cz; if (cz > maxZ) maxZ = cz;
+
+    // Volume (Signed tetrahedron)
+    const b_cross_c_x = by * cz - bz * cy;
+    const b_cross_c_y = bz * cx - bx * cz;
+    const b_cross_c_z = bx * cy - by * cx;
+    volume += (ax * b_cross_c_x + ay * b_cross_c_y + az * b_cross_c_z) / 6.0;
+
+    // Surface Area
+    const abx = bx - ax, aby = by - ay, abz = bz - az;
+    const acx = cx - ax, acy = cy - ay, acz = cz - az;
+    const nx = aby * acz - abz * acy;
+    const ny = abz * acx - abx * acz;
+    const nz = abx * acy - aby * acx;
+    surface += Math.sqrt(nx*nx + ny*ny + nz*nz) / 2.0;
+
+    centroidX += (ax + bx + cx) / 3;
+    centroidY += (ay + by + cy) / 3;
+    centroidZ += (az + bz + cz) / 3;
+
+    if (i < MAX_SAMPLES) {
+      sampledVerts[vIdx++] = ax; sampledVerts[vIdx++] = ay; sampledVerts[vIdx++] = az;
+      sampledVerts[vIdx++] = bx; sampledVerts[vIdx++] = by; sampledVerts[vIdx++] = bz;
+      sampledVerts[vIdx++] = cx; sampledVerts[vIdx++] = cy; sampledVerts[vIdx++] = cz;
     }
-    offset += 2; // attribute byte count
   }
 
-  return vertices;
+  const size = { x: maxX - minX, y: maxY - minY, z: maxZ - minZ };
+  return {
+    triCount,
+    volume: Math.abs(volume),
+    surface,
+    centerOfMass: { x: centroidX / triCount, y: centroidY / triCount, z: centroidZ / triCount },
+    bbox: {
+      min: { x: minX, y: minY, z: minZ },
+      max: { x: maxX, y: maxY, z: maxZ },
+      size,
+      center: { x: (minX + maxX)/2, y: (minY + maxY)/2, z: (minZ + maxZ)/2 },
+      diagonal: Math.sqrt(size.x*size.x + size.y*size.y + size.z*size.z)
+    },
+    sampledVerts
+  };
 }
 
 /**
@@ -299,17 +365,25 @@ function parseOBJVertices(text: string): Float32Array {
   const positions: [number, number, number][] = [];
   const out: number[] = [];
 
-  for (const line of text.split('\n')) {
-    const parts = line.trim().split(/\s+/);
-    if (parts[0] === 'v') {
-      positions.push([parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])]);
-    } else if (parts[0] === 'f') {
-      const indices = parts.slice(1).map(p => parseInt(p.split('/')[0]) - 1);
-      for (let i = 1; i < indices.length - 1; i++) {
-        const a = positions[indices[0]];
-        const b = positions[indices[i]];
-        const c = positions[indices[i + 1]];
-        if (a && b && c) out.push(...a, ...b, ...c);
+  let lineStart = 0;
+  for (let i = 0; i <= text.length; i++) {
+    if (i === text.length || text[i] === '\n') {
+      const line = text.substring(lineStart, i).trim();
+      lineStart = i + 1;
+      if (!line) continue;
+
+      if (line.startsWith('v ')) {
+        const parts = line.split(/\s+/);
+        positions.push([parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])]);
+      } else if (line.startsWith('f ')) {
+        const parts = line.split(/\s+/);
+        const indices = parts.slice(1).map(p => parseInt(p.split('/')[0]) - 1);
+        for (let j = 1; j < indices.length - 1; j++) {
+          const a = positions[indices[0]];
+          const b = positions[indices[j]];
+          const c = positions[indices[j + 1]];
+          if (a && b && c) out.push(...a, ...b, ...c);
+        }
       }
     }
   }
@@ -577,8 +651,19 @@ export class GeometryAnalysisService {
   ): Promise<GeometryAnalysisResult> {
     const start = Date.now();
 
+    // Limit buffer to ~100MB to prevent Supabase 546 Memory Limit Exceeded error
+    const MAX_FILE_SIZE = 100 * 1024 * 1024;
+    if (buffer.length > MAX_FILE_SIZE) {
+      throw new Error(`File is too large (${(buffer.length / 1024 / 1024).toFixed(1)}MB). Please upload a file smaller than 100MB to prevent memory timeouts.`);
+    }
+
     // 1. Parse vertices
     let verts: Float32Array;
+    let triCount = 0;
+    let bbox: BoundingBox;
+    let volume = 0;
+    let surface = 0;
+    let centerOfMass = { x: 0, y: 0, z: 0 };
 
     if (fileType === 'STL') {
       const headerStr = new TextDecoder('ascii').decode(buffer.subarray(0, 6)).toLowerCase();
@@ -588,7 +673,14 @@ export class GeometryAnalysisService {
         (buffer.length === 84 + dataView.getUint32(80, true) * 50);
 
       if (isBinary) {
-        verts = parseSTLVertices(buffer);
+        // High-performance, zero-allocation pass for massive files
+        const directAnalysis = analyzeBinarySTLDirect(buffer);
+        verts = directAnalysis.sampledVerts;
+        triCount = directAnalysis.triCount;
+        bbox = directAnalysis.bbox;
+        volume = directAnalysis.volume;
+        surface = directAnalysis.surface;
+        centerOfMass = directAnalysis.centerOfMass;
       } else {
         verts = parseSTLAsciiVertices(new TextDecoder('ascii').decode(buffer));
       }
@@ -596,17 +688,19 @@ export class GeometryAnalysisService {
       verts = parseOBJVertices(new TextDecoder('utf-8').decode(buffer));
     }
 
-    if (verts.length < 9) {
+    if (verts.length < 9 && !triCount) {
       throw new Error('File contains no valid geometry (less than 1 triangle parsed).');
     }
 
-    const triCount = verts.length / 9;
-
-    // 2. Bounding box
-    const bbox = computeBoundingBox(verts);
-
-    // 3. Volume + surface area + center of mass
-    const { volume, surface, centerOfMass } = computeVolumeAndSurface(verts);
+    // Fallback for ASCII STL and OBJ
+    if (triCount === 0) {
+      triCount = verts.length / 9;
+      bbox = computeBoundingBox(verts);
+      const vs = computeVolumeAndSurface(verts);
+      volume = vs.volume;
+      surface = vs.surface;
+      centerOfMass = vs.centerOfMass;
+    }
 
     // 4. Mesh topology (capped at 30k tris for performance)
     const topology = analyzeMeshTopology(verts);
@@ -760,6 +854,10 @@ export interface EstimationInput {
   supportFraction?: number;
   /** Layer height in mm */
   layerHeightMm?: number;
+  /** Whether raft/base is enabled */
+  raftEnabled?: boolean;
+  /** Number of raft layers */
+  raftLayers?: number;
 }
 
 export interface EstimationResult {
@@ -771,7 +869,11 @@ export interface EstimationResult {
   weightGrams: number;
   /** Support material weight (if any) in grams */
   supportWeightGrams: number;
-  /** Total weight including support and waste */
+  /** Raft material weight in grams */
+  raftWeightGrams: number;
+  /** Raft material volume in cm3 (mL) */
+  raftVolumeCm3: number;
+  /** Total weight including support, raft, and waste */
   totalWeightGrams: number;
   /** Total filament length in meters */
   filamentLengthM: number;
@@ -830,25 +932,32 @@ export class MaterialEstimationEngine {
       supportWeightGrams = supportVolumeCm3 * material.densityGcm3;
     }
 
-    // 4. Waste factor (FDM only — purge lines, skirt; SLA resin waste is negligible)
-    const wasteMaterialGrams = isSLA ? 0 : (modelWeightGrams + supportWeightGrams) * (WASTE_FACTOR - 1);
-    const totalWeightGrams = modelWeightGrams + supportWeightGrams + wasteMaterialGrams;
+    // 4. Raft material
+    let raftVolumeCm3 = 0;
+    let raftWeightGrams = 0;
+    if (input.raftEnabled) {
+      // area (mm2) * height (mm) / 1000 = cm3
+      raftVolumeCm3 = (size.x * size.y * ((input.raftLayers || 3) * layerHeightMm)) / 1000;
+      raftWeightGrams = raftVolumeCm3 * material.densityGcm3;
+    }
 
-    // 5. Filament length (FDM only)
+    // 5. Waste factor (FDM only — purge lines, skirt; SLA resin waste is negligible)
+    const wasteMaterialGrams = isSLA ? 0 : (modelWeightGrams + supportWeightGrams + raftWeightGrams) * (WASTE_FACTOR - 1);
+    const totalWeightGrams = modelWeightGrams + supportWeightGrams + raftWeightGrams + wasteMaterialGrams;
+
+    // 6. Filament length (FDM only)
     const filamentRadiusCm = (FILAMENT_DIAMETER_MM / 2) / 10;
     const filamentLengthCm = isSLA ? 0 : (totalWeightGrams / material.densityGcm3) /
       (Math.PI * filamentRadiusCm * filamentRadiusCm);
     const filamentLengthM = filamentLengthCm / 100;
 
-    // 6. Material cost
+    // 7. Material cost
     // FDM: cost = weight_grams × cost_per_gram  (e.g. 96g × $0.0667/g = $6.40)
     // SLA: cost = volume_mL   × cost_per_mL     (e.g. 86.24mL × $0.089/mL = $7.68)
-    //            Note: 1 cm³ = 1 mL, so volumeCm3 IS the volume in mL.
-    //            costPerGram in the DB stores cost_per_mL for SLA materials.
     let materialCostUsd: number;
     if (isSLA) {
       // SLA: volume-based pricing (1 cm³ = 1 mL)
-      const totalVolumeMl = effectiveVolumeCm3 + supportVolumeCm3;
+      const totalVolumeMl = effectiveVolumeCm3 + supportVolumeCm3 + raftVolumeCm3;
       materialCostUsd = totalVolumeMl * material.costPerGram; // costPerGram = cost_per_mL for SLA
     } else {
       // FDM: weight-based pricing
@@ -858,9 +967,9 @@ export class MaterialEstimationEngine {
     // 7. Print time estimate
     let printTimeMinutes = 0;
     if (isSLA) {
-      // SLA: Z-height based. Form 4 uses ~0.1mm layers; ~6s per layer (cure + lift)
-      const layerCount = size.z / 0.1;
-      const printTimeSeconds = layerCount * 6;
+      // SLA: match PreForm ~31.2s per layer average for Form 2/3
+      const layerCount = size.z / layerHeightMm;
+      const printTimeSeconds = layerCount * 31.2;
       printTimeMinutes = Math.max(5, Math.round(printTimeSeconds / 60));
     } else {
       // FDM: nozzle travel based (0.2mm layers, 0.4mm nozzle)
@@ -879,6 +988,8 @@ export class MaterialEstimationEngine {
       effectiveVolumeCm3: +effectiveVolumeCm3.toFixed(3),
       weightGrams: +modelWeightGrams.toFixed(2),
       supportWeightGrams: +supportWeightGrams.toFixed(2),
+      raftWeightGrams: +raftWeightGrams.toFixed(2),
+      raftVolumeCm3: +raftVolumeCm3.toFixed(3),
       totalWeightGrams: +totalWeightGrams.toFixed(2),
       filamentLengthM: +filamentLengthM.toFixed(2),
       materialCostUsd: +materialCostUsd.toFixed(4),
@@ -906,10 +1017,10 @@ export class MaterialEstimationEngine {
 }
 
 function formatPrintTime(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return `~${minutes} m`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return m > 0 ? `~${h} h ${m} m` : `~${h} h`;
 }
 
 export const materialEstimationEngine = new MaterialEstimationEngine();
@@ -997,14 +1108,18 @@ export interface QuoteResult {
   needsRepair: boolean;
   /** Printability grade from geometry analysis */
   printabilityGrade: string;
-  /** Printability score 0-100 */
-  printabilityScore: number;
   /** Volume breakdown in mL for the Summary panel */
   volumeBreakdown: {
     modelMl: number;
     supportsMl: number;
     raftMl: number;
     totalMl: number;
+  };
+  /** Cost breakdown based purely on material usage */
+  costBreakdown: {
+    modelCost: number;
+    supportRaftCost: number;
+    totalMaterialCost: number;
   };
 }
 
@@ -1107,20 +1222,36 @@ export class PricingService {
     const needsRepair = !geometry.quality.isManifold &&
       (geometry.quality.nonManifoldEdges > 0 || geometry.quality.boundaryEdges > 5);
 
-    // ── Volume breakdown (in mL, 1 cm³ = 1 mL) ───────────────────────────────
     const modelMl    = +estimation.effectiveVolumeCm3.toFixed(2);
     const supportsMl = +estimation.supportWeightGrams > 0
       ? +(estimation.supportWeightGrams / estimation.material.densityGcm3).toFixed(2)
       : 0;
-    // Raft: footprint area (X*Z mm²) × raft thickness (raftLayers × layerHeight mm) / 1000 → mL
-    const raftEnabled   = (this.config as any).raftEnabled ?? false;
-    const raftLayers    = (this.config as any).raftLayers  ?? 3;
-    const layerHeightMm = (this.config as any).layerHeightMm ?? (isSLA ? 0.1 : 0.2);
-    const bbox = geometry.boundingBox.size;
-    const raftMl = raftEnabled && !isSLA
-      ? +((bbox.x * bbox.y * raftLayers * layerHeightMm) / 1000).toFixed(2)
-      : 0;
+    
+    const raftMl = +(estimation.raftVolumeCm3).toFixed(2);
     const totalMl = +(modelMl + supportsMl + raftMl).toFixed(2);
+
+    // ── Cost breakdown (Pure Material) ───────────────────────────────────────
+    let modelCost = 0;
+    let supportRaftCost = 0;
+    let totalMaterialCost = 0;
+
+    if (isSLA) {
+      const costPerMl = M / Q; // $ per mL
+      modelCost = modelMl * costPerMl;
+      supportRaftCost = (supportsMl + raftMl) * costPerMl;
+    } else {
+      const filamentRadiusCm = (FILAMENT_DIAMETER_MM / 2) / 10;
+      const areaCm2 = Math.PI * filamentRadiusCm * filamentRadiusCm;
+      // length = vol / area
+      const costPerCm3 = (M / Q) / areaCm2; // cost per cm³ of solid filament
+      modelCost = modelMl * costPerCm3;
+      supportRaftCost = (supportsMl + raftMl) * costPerCm3;
+    }
+    
+    // Apply material multiplier Y
+    modelCost *= Y;
+    supportRaftCost *= Y;
+    totalMaterialCost = modelCost + supportRaftCost;
 
     return {
       lineItems,
@@ -1144,6 +1275,11 @@ export class PricingService {
       printabilityGrade: geometry.printability.grade,
       printabilityScore: geometry.printability.score,
       volumeBreakdown: { modelMl, supportsMl, raftMl, totalMl },
+      costBreakdown: {
+        modelCost: +modelCost.toFixed(2),
+        supportRaftCost: +supportRaftCost.toFixed(2),
+        totalMaterialCost: +totalMaterialCost.toFixed(2),
+      }
     };
   }
 
@@ -1289,6 +1425,8 @@ serve(async (req) => {
       needsSupport: Boolean(settingsMap.supports_enabled ?? true),
       supportFraction: Number(settingsMap.support_density ?? 0.15),
       layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2), 
+      raftEnabled: Boolean(settingsMap.raft_enabled ?? false),
+      raftLayers: Number(settingsMap.raft_layers ?? 3),
     });
 
     // 4. Final Pricing Quote
