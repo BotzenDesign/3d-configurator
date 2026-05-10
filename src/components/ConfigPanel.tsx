@@ -156,7 +156,7 @@ export default function ConfigPanel({
       const result = await createCheckout({
         title: `Custom 3D Print - ${modelName}`,
         quantity,
-        price: Math.round((quote?.totalUsd ?? 0) * 100),
+        price: Math.round((quote?.perUnitUsd ?? 0) * 100),
         properties: {
           "Print Type":  printType,
           Material:      currentMaterial?.label || "Unknown",
