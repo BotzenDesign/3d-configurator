@@ -140,7 +140,7 @@ function DemoModel({
   const geo = useMemo(() => {
     switch (type) {
       case "bear":
-        return <sphereGeometry args={[30, 32, 32]} />;
+        return <cylinderGeometry args={[15, 15, 45, 32]} />;
       case "mug":
         return <cylinderGeometry args={[18, 18, 40, 32]} />;
       case "helmet":
@@ -379,34 +379,6 @@ export default function ModelViewer({ modelType, color, geometry, printType = "F
           lowPowerMode={device.lowPowerMode}
         />
 
-        {/* Max Build Volume overlay — top-right corner */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            zIndex: 20,
-            background: 'rgba(0,0,0,0.55)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 10,
-            padding: '8px 12px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2,
-          }}
-        >
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            Max Build Volume
-          </span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)', fontVariantNumeric: 'tabular-nums' }}>
-            {bv.l}L × {bv.w}W × {bv.h}H mm
-          </span>
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
-            {printType === 'FDM' ? 'Ultimaker S8' : 'Form 4'}
-          </span>
-        </div>
-
         <Canvas
           camera={{ position: [120, 80, 120], fov: 50 }}
           gl={{
@@ -441,7 +413,7 @@ export default function ModelViewer({ modelType, color, geometry, printType = "F
             {/* Environment — skip on low-end devices */}
             {device.enableEnvironment && <Environment preset="studio" />}
 
-            <PrintBed />
+            <PrintBed printType={printType} />
 
             {/* Contact shadows — skip on low-end devices */}
             {device.enableShadows && (

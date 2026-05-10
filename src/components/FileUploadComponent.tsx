@@ -111,7 +111,7 @@ export default function FileUploadComponent({ onFileAccepted, className = "" }: 
               Browse Files
             </button>
             <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><FileType size={12} /> .STL, .OBJ</span>
+              <span className="flex items-center gap-1"><FileType size={12} /> .STL, .OBJ, .3MF</span>
               <span>Max {MAX_FILE_SIZE_MB}MB</span>
             </div>
           </>
@@ -132,7 +132,7 @@ export default function FileUploadComponent({ onFileAccepted, className = "" }: 
         <input
           ref={fileRef}
           type="file"
-          accept=".stl,.obj"
+          accept=".stl,.obj,.3mf"
           className="hidden"
           onChange={handleChange}
           aria-hidden="true"

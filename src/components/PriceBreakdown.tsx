@@ -115,153 +115,17 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
   if (!quote) return null;
 
   // ── Computed values ──────────────────────────────────────────────────────────
-  const isSLA = quote.isSLA ?? printType === 'SLA';
-  const vol = quote.volumeBreakdown;
-  const wt = quote.weightBreakdown;
-  const cost = quote.costBreakdown;
-
-  const materialUnit = isSLA ? 'mL' : 'g';
-  const totalMaterial = isSLA 
-    ? (vol ? vol.totalMl : (modelStats ? parseVolumeMl(modelStats.volume) : null))
-    : (wt ? wt.totalGrams : null);
-
-  const modelAmount = isSLA 
-    ? (vol ? `${vol.modelMl.toFixed(2)} mL` : (totalMaterial !== null ? `${totalMaterial.toFixed(2)} mL` : '—'))
-    : (wt ? `${wt.modelGrams.toFixed(2)} g` : '—');
-
-  const suppAmount = isSLA 
-    ? (vol ? `${vol.supportsMl.toFixed(2)} mL` : '0.00 mL')
-    : (wt ? `${wt.supportsGrams.toFixed(2)} g` : '0.00 g');
-
-  const raftAmount = isSLA 
-    ? (vol ? `${vol.raftMl.toFixed(2)} mL` : '0.00 mL')
-    : (wt ? `${wt.raftGrams.toFixed(2)} g` : '0.00 g');
-
-  const layers    = modelStats ? estimateLayers(modelStats.dimensions, isSLA ? 'SLA' : 'FDM') : null;
-  const printTime = quote.display.printTime;
-  const score     = quote.printabilityScore;
-  const scoreColor = score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
-
-  const totalCost = cost ? cost.totalMaterialCost.toFixed(2) : '0.00';
-  const modelCost = cost ? cost.modelCost.toFixed(2) : '0.00';
-  const supportRaftCost = cost ? cost.supportRaftCost.toFixed(2) : '0.00';
-  const touchpoints = 470; // Hardcoded touchpoints visual for now
+  const isSLA = quote?.isSLA ?? printType === 'SLA';
+  const totalCost = (quote?.totalUsd ?? 0).toFixed(2);
 
   return (
-    <div style={s.card}>
-      <div className="p-4 space-y-4">
-        {/* Header */}
-        <div className="flex justify-between items-center pb-2 border-b border-border">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-lg text-foreground">Summary</h3>
-            <Info className="w-4 h-4 text-muted-foreground" />
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {/* Time Estimate */}
-          <div className="flex justify-between items-center text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="w-4 h-4" />
-              <span>Time Estimate</span>
-              <Info className="w-4 h-4" />
-            </div>
-            <div className="font-medium text-foreground flex items-center gap-2">
-              {printTime} <RefreshCcw className="w-3.5 h-3.5" />
-            </div>
-          </div>
-
-          {/* Material Block */}
-          <div className="flex justify-between items-center text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Droplets className="w-4 h-4" />
-              <span>{isSLA ? 'Volume' : 'Material Weight'}</span>
-            </div>
-            <div className="font-medium text-foreground flex items-center gap-1">
-              {totalMaterial !== null ? `${totalMaterial.toFixed(2)} ${materialUnit}` : '—'} <ChevronDown className="w-4 h-4" />
-            </div>
-          </div>
-          
-          <div className="pl-6 border-l-[1.5px] border-border ml-[7px] space-y-1.5 mt-2">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Model(s)</span>
-              <span className="text-foreground">{modelAmount}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Supports</span>
-              <span className="text-foreground">{suppAmount}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">{isSLA ? 'Raft' : 'Raft / Skirt'}</span>
-              <span className="text-foreground">{raftAmount}</span>
-            </div>
-            {!isSLA && quote.filamentLengthM && (
-              <div className="flex justify-between items-center text-sm pt-1 border-t border-border/50">
-                <span className="text-muted-foreground">Filament Used</span>
-                <span className="text-foreground">{quote.filamentLengthM.toFixed(2)} m</span>
-              </div>
-            )}
-          </div>
-
-          {/* Cost Block */}
-          <div className="flex justify-between items-center text-sm pt-2">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <DollarSign className="w-4 h-4" />
-              <span>Total Print Cost</span>
-              <Info className="w-4 h-4" />
-            </div>
-            <div className="font-medium text-blue-500 flex items-center gap-1">
-              {totalCost} <ChevronDown className="w-4 h-4" />
-            </div>
-          </div>
-          
-          <div className="pl-6 border-l-[1.5px] border-border ml-[7px] space-y-1.5 mt-2">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Model Cost</span>
-              <span className="text-blue-500">{modelCost}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Support & Raft Cost</span>
-              <span className="text-blue-500">{supportRaftCost}</span>
-            </div>
-          </div>
-
-          {/* Touchpoints (SLA Only) */}
-          {isSLA && (
-            <div className="flex justify-between items-center text-sm pt-2">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Wand2 className="w-4 h-4" />
-                <span>Touchpoints</span>
-              </div>
-              <div className="font-medium text-foreground">
-                {touchpoints}
-              </div>
-            </div>
-          )}
-
-          {/* Layers */}
-          <div className="flex justify-between items-center text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Layers className="w-4 h-4" />
-              <span>Layers</span>
-            </div>
-            <div className="font-medium text-foreground">
-              {layers !== null ? layers.toLocaleString() : '—'}
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-4 mt-2 border-t border-border">
-          {/* Printability */}
-          <div style={s.printabilityWrap}>
-            <div style={s.printabilityTop}>
-              <span style={s.printabilityLabel}>Printability</span>
-              <span style={{ ...s.printabilityScore, color: scoreColor }}>{score}/100</span>
-            </div>
-            <div style={s.barTrack}>
-              <div style={{ ...s.barFill, width: `${score}%`, background: scoreColor }} />
-            </div>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col items-center justify-center py-12 bg-black/20 rounded-3xl border border-white/5 shadow-2xl backdrop-blur-xl">
+        <div className="flex items-start gap-2">
+          <span className="text-3xl font-black text-primary/40 mt-4">$</span>
+          <span className="text-9xl font-black tracking-tighter text-primary drop-shadow-[0_0_40px_rgba(0,188,212,0.4)]">
+            {totalCost}
+          </span>
         </div>
       </div>
     </div>
@@ -273,8 +137,6 @@ const s: Record<string, React.CSSProperties> = {
   card: {
     margin: '0 0 8px',
     borderRadius: 14,
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
     overflow: 'hidden',
   },
   header: {

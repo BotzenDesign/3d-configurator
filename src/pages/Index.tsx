@@ -7,6 +7,7 @@ import ModelSelector from "@/components/ModelSelector";
 import ModelStats from "@/components/ModelStats";
 import { parseSTL, computeStats } from "@/lib/stlParser";
 import { parseOBJBuffer } from "@/lib/objParser";
+import { parse3MF } from "@/lib/threemfParser";
 import { validate3DFile } from "@/utils/fileValidation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
@@ -39,7 +40,7 @@ export default function Index() {
 
   const handleFileUpload = useCallback((file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const buffer = e.target?.result as ArrayBuffer;
       try {
         let geometry: THREE.BufferGeometry;
@@ -49,6 +50,11 @@ export default function Index() {
           const result = parseOBJBuffer(buffer);
           geometry = result.geometry;
           toast.success(`OBJ loaded: ${result.vertexCount.toLocaleString()} vertices, ${result.faceCount.toLocaleString()} faces`);
+        } else if (ext === "3mf") {
+          geometry = await parse3MF(buffer);
+          const posAttr = geometry.getAttribute("position");
+          const triCount = posAttr.count / 3;
+          toast.success(`3MF loaded: ${triCount.toLocaleString()} triangles`);
         } else {
           geometry = parseSTL(buffer);
           const posAttr = geometry.getAttribute("position");
@@ -103,7 +109,7 @@ export default function Index() {
   // ── Mobile Layout ──────────────────────────────────────────────────────
   if (isMobile) {
     return (
-      <div className="flex flex-col h-[100dvh] overflow-hidden">
+      <div className="flex flex-col h-screen overflow-hidden">
         <Navbar />
 
         {/* Tab switcher */}
@@ -166,7 +172,7 @@ export default function Index() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".stl,.obj"
+          accept=".stl,.obj,.3mf"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -215,7 +221,7 @@ export default function Index() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".stl,.obj"
+            accept=".stl,.obj,.3mf"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];

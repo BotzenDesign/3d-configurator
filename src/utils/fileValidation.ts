@@ -6,7 +6,7 @@ export interface ValidationResult {
 export const MAX_FILE_SIZE_MB = 100;
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-export const ALLOWED_EXTENSIONS = [".stl", ".obj"];
+export const ALLOWED_EXTENSIONS = [".stl", ".obj", ".3mf"];
 
 export function validate3DFile(file: File): ValidationResult {
   const fileName = file.name.toLowerCase();

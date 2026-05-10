@@ -1,12 +1,13 @@
-
-
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import JSZip from "https://esm.sh/jszip@3.10.1";
+import * as THREE from "https://esm.sh/three@0.160.0";
 
 export interface ValidationReport {
   isValid: boolean;
   errors: string[];
   warnings: string[];
   metadata?: {
-    fileType: "STL" | "OBJ" | "UNKNOWN";
+    fileType: "STL" | "OBJ" | "3MF" | "UNKNOWN";
     fileSize: number;
     volume?: number;
     surfaceArea?: number;
@@ -15,7 +16,7 @@ export interface ValidationReport {
 
 export class FileValidationService {
   private static MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-  private static ALLOWED_EXTENSIONS = [".stl", ".obj"];
+  private static ALLOWED_EXTENSIONS = [".stl", ".obj", ".3mf"];
 
   /**
    * Validate uploaded 3D file for structure, safety, and metadata.
@@ -38,7 +39,7 @@ export class FileValidationService {
     // 1. Basic checks
     if (fileSize > FileValidationService.MAX_FILE_SIZE) {
       report.isValid = false;
-      report.errors.push(`File is too large. Max size is 50MB.`);
+      report.errors.push(`File is too large. Max size is 100MB.`);
     }
 
     const lowerName = originalName.toLowerCase();
@@ -47,11 +48,11 @@ export class FileValidationService {
     );
     if (!ext) {
       report.isValid = false;
-      report.errors.push(`Invalid extension. Allowed: .stl, .obj`);
+      report.errors.push(`Invalid extension. Allowed: .stl, .obj, .3mf`);
       return report;
     }
 
-    report.metadata!.fileType = ext === ".stl" ? "STL" : "OBJ";
+    report.metadata!.fileType = ext === ".stl" ? "STL" : ext === ".obj" ? "OBJ" : "3MF";
 
     // 2. Malware & Structure check via magic numbers/header parsing
     try {
@@ -59,6 +60,12 @@ export class FileValidationService {
         this.validateSTLStructure(fileBuffer, report);
       } else if (report.metadata!.fileType === "OBJ") {
         this.validateOBJStructure(fileBuffer, report);
+      } else if (report.metadata!.fileType === "3MF") {
+        // 3MF is a ZIP file, starts with PK\x03\x04
+        if (fileBuffer.length < 4 || fileBuffer[0] !== 0x50 || fileBuffer[1] !== 0x4B || fileBuffer[2] !== 0x03 || fileBuffer[3] !== 0x04) {
+          report.isValid = false;
+          report.errors.push("Invalid 3MF file: missing ZIP signature.");
+        }
       }
     } catch (e: any) {
       report.isValid = false;
@@ -647,7 +654,7 @@ export class GeometryAnalysisService {
    */
   async analyzeBuffer(
     buffer: Uint8Array,
-    fileType: 'STL' | 'OBJ'
+    fileType: 'STL' | 'OBJ' | '3MF'
   ): Promise<GeometryAnalysisResult> {
     const start = Date.now();
 
@@ -684,8 +691,10 @@ export class GeometryAnalysisService {
       } else {
         verts = parseSTLAsciiVertices(new TextDecoder('ascii').decode(buffer));
       }
-    } else {
+    } else if (fileType === 'OBJ') {
       verts = parseOBJVertices(new TextDecoder('utf-8').decode(buffer));
+    } else {
+      verts = await parse3MFVertices(buffer);
     }
 
     if (verts.length < 9 && !triCount) {
@@ -913,6 +922,10 @@ export class MaterialEstimationEngine {
     } = input;
 
     const material = MATERIALS[materialId];
+    
+    if (!material) {
+      throw new Error(`Material with ID "${materialId}" not found in database.`);
+    }
 
     // ── FDM uses WEIGHT for cost. SLA uses VOLUME for cost (per PDF spec). ──
     const isSLA = material.isResin;
@@ -1176,15 +1189,15 @@ export class PricingService {
     let materialNote: string;
 
     if (isSLA) {
-      const B = estimation.effectiveVolumeCm3; // B: mL of resin used
+      const B = estimation.effectiveVolumeCm3 + (estimation.supportWeightGrams / mat.densityGcm3) + estimation.raftVolumeCm3; // Total mL used
       const costPerMl = M / Q;                 // M/V
       materialCost = Y * costPerMl * B;        // Y × M/V × B
-      materialNote = `Y(${Y}) × $${M}/${Q}mL × ${B.toFixed(2)}mL`;
+      materialNote = `Y(${Y}) × $${M}/${Q}mL × ${B.toFixed(2)}mL (Total)`;
     } else {
-      const A = estimation.filamentLengthM;    // A: meters of filament used
+      const A = estimation.filamentLengthM;    // A: meters of filament used (already includes support/raft in estimate())
       const costPerMeter = M / Q;              // M/L
       materialCost = Y * costPerMeter * A;    // Y × M/L × A
-      materialNote = `Y(${Y}) × $${M}/${Q}m × ${A.toFixed(2)}m`;
+      materialNote = `Y(${Y}) × $${M}/${Q}m × ${A.toFixed(2)}m (Total)`;
     }
 
     lineItems.push({
@@ -1291,23 +1304,6 @@ export class PricingService {
     };
   }
 
-  /**
-   * Quick price estimate from raw volume + material (no full geometry analysis needed).
-   * Uses the Botzen formula with the material's own spool cost/quantity.
-   *
-   * FDM: Y × (M/L) × filamentMeters
-   * SLA: Y × (M/V) × volumeMl
-   */
-  quickEstimate(volumeCm3: number, material: Material, filamentLengthM = 0): number {
-    const Y = this.config.materialMultiplierY;
-    const M = material.spoolCost;
-    const Q = material.spoolQuantity;
-    if (material.isResin) {
-      return +(Y * (M / Q) * volumeCm3).toFixed(2); // B = volumeCm3 mL
-    } else {
-      return +(Y * (M / Q) * filamentLengthM).toFixed(2); // A = meters
-    }
-  }
 }
 
 function formatUsd(amount: number): string {
@@ -1322,14 +1318,65 @@ function formatUsd(amount: number): string {
 export const pricingService = new PricingService();
 
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+async function parse3MFVertices(buffer: Uint8Array): Promise<Float32Array> {
+  const zip = new JSZip();
+  const loadedZip = await zip.loadAsync(buffer);
+  
+  const modelFile = loadedZip.file('3D/3dmodel.model');
+  if (!modelFile) {
+    throw new Error("Invalid 3MF file: missing 3D/3dmodel.model");
+  }
+
+  const xmlText = await modelFile.async("text");
+  
+  // Use a more memory-efficient approach by not storing all vertex objects
+  const vertexData = new Float32Array(xmlText.length / 10); // Rough pre-allocation
+  let vertexCount = 0;
+  
+  // vertexRegex: match <vertex x="..." y="..." z="..." />
+  const vertexRegex = /<vertex\s+[^>]*x="([^"]+)"[^>]*y="([^"]+)"[^>]*z="([^"]+)"/gi;
+  let vMatch;
+  while ((vMatch = vertexRegex.exec(xmlText)) !== null) {
+    if (vertexCount * 3 + 3 > vertexData.length) break; // Safety
+    vertexData[vertexCount * 3]     = parseFloat(vMatch[1]);
+    vertexData[vertexCount * 3 + 1] = parseFloat(vMatch[2]);
+    vertexData[vertexCount * 3 + 2] = parseFloat(vMatch[3]);
+    vertexCount++;
+  }
+
+  // Triangle parsing - use a pre-allocated Float32Array to avoid memory spikes from standard arrays
+  const positions = new Float32Array(vertexCount * 12); // Heuristic: 4 triangles per vertex
+  let posIdx = 0;
+  
+  const triangleRegex = /<triangle\s+[^>]*v1="([^"]+)"[^>]*v2="([^"]+)"[^>]*v3="([^"]+)"/gi;
+  let tMatch;
+  while ((tMatch = triangleRegex.exec(xmlText)) !== null) {
+    const v1 = parseInt(tMatch[1], 10);
+    const v2 = parseInt(tMatch[2], 10);
+    const v3 = parseInt(tMatch[3], 10);
+    
+    if (v1 < vertexCount && v2 < vertexCount && v3 < vertexCount) {
+      if (posIdx + 9 > positions.length) break; // Safety
+      
+      positions[posIdx++] = vertexData[v1*3]; positions[posIdx++] = vertexData[v1*3+1]; positions[posIdx++] = vertexData[v1*3+2];
+      positions[posIdx++] = vertexData[v2*3]; positions[posIdx++] = vertexData[v2*3+1]; positions[posIdx++] = vertexData[v2*3+2];
+      positions[posIdx++] = vertexData[v3*3]; positions[posIdx++] = vertexData[v3*3+1]; positions[posIdx++] = vertexData[v3*3+2];
+    }
+  }
+
+  return positions.subarray(0, posIdx);
+}
 
 // Initialize Supabase Client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const supabase = createClient(supabaseUrl, supabaseKey);
 
+if (!supabaseUrl || !supabaseKey) {
+  console.error("CRITICAL: SUPABASE_URL or SUPABASE_ANON_KEY is missing from environment variables.");
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1337,18 +1384,43 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[${requestId}] Request received: ${req.method} ${req.url}`);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    console.log(`[${requestId}] Handling OPTIONS preflight`);
+    return new Response("ok", { 
+      status: 200, 
+      headers: corsHeaders 
+    });
   }
 
   try {
-    // 1. Fetch live configuration from Database
-    const [{ data: dbMaterials }, { data: dbSettings }] = await Promise.all([
+    // Move initialization inside the handler to be more robust
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    console.log(`[${requestId}] 1. Fetching config from DB...`);
+    const [matRes, setRes] = await Promise.all([
       supabase.from("materials").select("*").eq("is_active", true),
       supabase.from("app_settings").select("*")
     ]);
+
+    if (matRes.error) {
+      console.error(`[${requestId}] Materials Fetch Error:`, matRes.error);
+      throw new Error(`Database error (materials): ${matRes.error.message}`);
+    }
+    if (setRes.error) {
+      console.error(`[${requestId}] Settings Fetch Error:`, setRes.error);
+      throw new Error(`Database error (settings): ${setRes.error.message}`);
+    }
+
+    const dbMaterials = matRes.data || [];
+    const dbSettings = setRes.data || [];
+    console.log(`[${requestId}] Fetched ${dbMaterials.length} materials and ${dbSettings.length} settings.`);
 
     // Reconstruct MATERIALS record from DB rows
     MATERIALS = (dbMaterials || []).reduce((acc: any, mat: any) => {
@@ -1357,9 +1429,9 @@ serve(async (req) => {
         id:              mat.id,
         name:            mat.label,
         densityGcm3:     Number(mat.density_gcm3 || (isSLA ? 1.1 : 1.24)),
-        costPerGram:     Number(mat.cost_per_gram),      // legacy fallback
-        spoolCost:       Number(mat.spool_cost ?? mat.cost_per_gram * (isSLA ? 1000 : 335)), // M
-        spoolQuantity:   Number(mat.spool_quantity ?? (isSLA ? 1000 : 335)), // L (m) or V (mL)
+        costPerGram:     Number(mat.cost_per_gram),
+        spoolCost:       Number(mat.spool_cost ?? mat.cost_per_gram * (isSLA ? 1000 : 335)),
+        spoolQuantity:   Number(mat.spool_quantity ?? (isSLA ? 1000 : 335)),
         maxSpeedMms:     isSLA ? 0 : 80,
         isResin:         isSLA,
         description:     mat.price_label,
@@ -1367,6 +1439,8 @@ serve(async (req) => {
       };
       return acc;
     }, {});
+
+    console.log(`[${requestId}] Reconstructed MATERIALS:`, Object.keys(MATERIALS));
 
     // Reconstruct pricing config from app_settings
     const settingsMap = (dbSettings || []).reduce((acc: any, s: any) => {
@@ -1378,7 +1452,7 @@ serve(async (req) => {
       materialMultiplierY: Number(settingsMap.material_multiplier_Y ?? 2.0),
       runTimeMultiplierW:  Number(settingsMap.run_time_multiplier_W ?? 1.25),
       // Support & raft settings
-      raftEnabled:   settingsMap.raft_enabled === "false" ? false : true,
+      raftEnabled:   settingsMap.raft_enabled === false || settingsMap.raft_enabled === "false" ? false : true,
       raftLayers:    Number(settingsMap.raft_layers  ?? 3),
       layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2),
     } as any);
@@ -1415,7 +1489,7 @@ serve(async (req) => {
     }
 
     // 2. Geometry Analysis
-    const fileType = validation.metadata!.fileType as "STL" | "OBJ";
+    const fileType = validation.metadata!.fileType as "STL" | "OBJ" | "3MF";
     const geometry = await geometryAnalysisService.analyzeBuffer(fileBuffer, fileType);
 
     // 3. Material & Time Estimation
@@ -1433,7 +1507,7 @@ serve(async (req) => {
       needsSupport: settingsMap.supports_enabled === "false" ? false : true,
       supportFraction: Number(settingsMap.support_density ?? 0.15),
       layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2), 
-      raftEnabled: settingsMap.raft_enabled === "false" ? false : true,
+      raftEnabled: settingsMap.raft_enabled === false || settingsMap.raft_enabled === "false" ? false : true,
       raftLayers: Number(settingsMap.raft_layers ?? 3),
     });
 

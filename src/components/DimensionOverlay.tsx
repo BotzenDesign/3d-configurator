@@ -114,7 +114,7 @@ export default function DimensionOverlay({ boundingBox, visible = true, realDime
     }
 
     const fmt = (real: number | null, scaled: number) =>
-      real !== null ? `${real.toFixed(0)}mm` : `${scaled.toFixed(1)}mm`;
+      real !== null ? `${real.toFixed(2)}mm` : `${scaled.toFixed(2)}mm`;
 
     const offset = 8;
 
