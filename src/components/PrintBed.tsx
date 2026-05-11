@@ -28,11 +28,23 @@ export default function PrintBed({ printType = "FDM" }: PrintBedProps) {
         <meshStandardMaterial color="#3a3a3a" roughness={0.8} />
       </mesh>
       
-      {/* Grid lines */}
-      <gridHelper
-        args={[Math.max(GRID_SIZE_X, GRID_SIZE_Z), GRID_DIVISIONS, "#555555", "#444444"]}
-        position={[0, 0.01, 0]}
-      />
+      {/* Rectangular Grid Lines */}
+      <group position={[0, 0.01, 0]}>
+        {/* Horizontal lines */}
+        {Array.from({ length: Math.floor(GRID_SIZE_Z / 10) + 1 }).map((_, i) => (
+          <mesh key={`h-${i}`} position={[0, 0, (i * 10) - (GRID_SIZE_Z / 2)]}>
+            <boxGeometry args={[GRID_SIZE_X, 0.05, 0.1]} />
+            <meshBasicMaterial color="#555555" transparent opacity={0.3} />
+          </mesh>
+        ))}
+        {/* Vertical lines */}
+        {Array.from({ length: Math.floor(GRID_SIZE_X / 10) + 1 }).map((_, i) => (
+          <mesh key={`v-${i}`} position={[(i * 10) - (GRID_SIZE_X / 2), 0, 0]}>
+            <boxGeometry args={[0.1, 0.05, GRID_SIZE_Z]} />
+            <meshBasicMaterial color="#555555" transparent opacity={0.3} />
+          </mesh>
+        ))}
+      </group>
       
       {/* Raised edges */}
       {[
