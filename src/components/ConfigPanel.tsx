@@ -104,7 +104,12 @@ export default function ConfigPanel({
   // Update color when materials load
   useEffect(() => {
     if (availableColors.length > 0 && availableColors[colorIdx]) {
-      onColorChange(COLOR_HEX[availableColors[colorIdx]] ?? "#00bcd4");
+      const colorName = availableColors[colorIdx];
+      // Robust lookup: Try direct match, then title-case fallback
+      const hex = COLOR_HEX[colorName] || 
+                  COLOR_HEX[colorName.charAt(0).toUpperCase() + colorName.slice(1).toLowerCase()] || 
+                  "#00bcd4";
+      onColorChange(hex);
     }
   }, [materials.length, materialIdx, colorIdx, availableColors]);
 
@@ -135,7 +140,11 @@ export default function ConfigPanel({
 
   const handleColorSelect = (idx: number) => {
     setColorIdx(idx);
-    onColorChange(COLOR_HEX[availableColors[idx]] ?? "#00bcd4");
+    const colorName = availableColors[idx];
+    const hex = COLOR_HEX[colorName] || 
+                COLOR_HEX[colorName.charAt(0).toUpperCase() + colorName.slice(1).toLowerCase()] || 
+                "#00bcd4";
+    onColorChange(hex);
   };
 
   const handleFileAccepted = (file: File) => {
@@ -283,7 +292,11 @@ export default function ConfigPanel({
                 </select>
                 <div
                   className="w-5 h-5 rounded-full border-2 border-border ml-2 flex-shrink-0"
-                  style={{ backgroundColor: COLOR_HEX[availableColors[colorIdx]] ?? "#888" }}
+                  style={{ 
+                    backgroundColor: (COLOR_HEX[availableColors[colorIdx]] || 
+                                     COLOR_HEX[availableColors[colorIdx]?.charAt(0).toUpperCase() + availableColors[colorIdx]?.slice(1).toLowerCase()]) || 
+                                     "#888" 
+                  }}
                 />
               </div>
             )}
