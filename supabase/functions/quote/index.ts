@@ -1000,34 +1000,37 @@ export class MaterialEstimationEngine {
     } else {
       // FDM: Volumetric estimation based on formula.md (Cura Logic)
       const nozzleDiameterMm = 0.4;
-      const lineWidthMultiplier = 1.05; // Standard Cura default
-      const lineWidth = nozzleDiameterMm * lineWidthMultiplier;
+      const lineWidth = nozzleDiameterMm * 1.05; // Standard Cura default
       const filamentArea = Math.PI * Math.pow(FILAMENT_DIAMETER_MM / 2, 2);
       
-      // Calculate travel distance (L_travel) for shells and infill
-      // Shells: surface area / layer height / nozzle diameter * shellCount
+      // Calculate travel distance (L_travel) for ALL components
+      // 1. Model Shells: surface area * shellCount
       const shellPathMm = (surfaceAreaCm2 * 100) * (input.infill.shellCount || 2);
       
-      // Infill: line_spacing = line_width / (infill_density / 100)
-      const infillDensity = Math.max(1, input.infill.percentage) / 100;
-      const infillPathMm = (effectiveVolumeCm3 * 1000) / (lineWidth * layerHeightMm);
+      // 2. Model Infill: (Volume - ShellVolume) / (Area of extrusion)
+      // Note: We subtract shell volume to avoid double-counting
+      const shellVolumeMm3 = (surfaceAreaCm2 * 100) * (lineWidth * (input.infill.shellCount || 2));
+      const modelInfillVolumeMm3 = Math.max(0, (volumeCm3 * 1000) - shellVolumeMm3) * (input.infill.percentage / 100);
+      const modelInfillPathMm = modelInfillVolumeMm3 / (lineWidth * layerHeightMm);
 
-      const totalTravelMm = shellPathMm + infillPathMm;
+      // 3. Support & Raft Path
+      const supportPathMm = (supportVolumeCm3 * 1000) / (lineWidth * layerHeightMm);
+      const raftPathMm = (raftVolumeCm3 * 1000) / (lineWidth * layerHeightMm);
+
+      const totalTravelMm = (shellPathMm + modelInfillPathMm + supportPathMm + raftPathMm) * WASTE_FACTOR;
       
       // E = (line_width * layer_height * travel_distance) / filament_area
+      // This is the "A" variable in the Botzen formula (converted to meters)
       const extrusionVolumeMm3 = (lineWidth * layerHeightMm * totalTravelMm);
-      const filamentLengthMm = extrusionVolumeMm3 / filamentArea;
-      finalFilamentLengthM = filamentLengthMm / 1000;
+      finalFilamentLengthM = (extrusionVolumeMm3 / filamentArea) / 1000;
       
       // Update print time using travel speed
       const printSpeedMms = Math.max(1, Math.min(material.maxSpeedMms, 60));
       const extrusionTimeSeconds = totalTravelMm / printSpeedMms;
       
-      // Add retraction overhead (E_retract) - approx 1.5s per 100mm of path
-      const retractionOverhead = (totalTravelMm / 100) * 1.5;
-      
+      // Add mechanical overhead (retractions, layer changes, travel moves)
       const setupOverheadMinutes = 10;
-      printTimeMinutes = Math.max(setupOverheadMinutes + 5, Math.round((extrusionTimeSeconds + retractionOverhead) / 60) + setupOverheadMinutes);
+      printTimeMinutes = Math.round(extrusionTimeSeconds / 60) + setupOverheadMinutes;
     }
 
     const estimatedPrintTime = formatPrintTime(printTimeMinutes);
