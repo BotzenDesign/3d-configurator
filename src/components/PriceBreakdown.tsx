@@ -132,7 +132,13 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
       <div className="space-y-4 pt-4 border-t border-white/5">
         <div className="flex justify-between items-end">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-50">Formula Breakdown</span>
-          <span className="text-[9px] font-mono text-muted-foreground italic">Botzen Engine v2.1</span>
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="text-[9px] font-mono text-muted-foreground italic">Botzen Engine v2.1</span>
+            <div className="flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+              <Wand2 size={8} className="text-primary" />
+              <span className="text-[8px] font-bold text-primary uppercase tracking-tighter">Cura Engine Optimized</span>
+            </div>
+          </div>
         </div>
         
         <div className="grid grid-cols-2 gap-3">

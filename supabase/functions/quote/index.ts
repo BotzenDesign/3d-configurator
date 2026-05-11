@@ -980,25 +980,54 @@ export class MaterialEstimationEngine {
 
     // 7. Print time estimate
     let printTimeMinutes = 0;
+    let finalFilamentLengthM = filamentLengthM;
+
     if (isSLA) {
-      // SLA: match PreForm ~31.2s per layer average for Form 2/3
-      const layerCount = size.z / layerHeightMm;
-      const printTimeSeconds = layerCount * 31.2;
-      printTimeMinutes = Math.max(5, Math.round(printTimeSeconds / 60));
+      // SLA: Exposure-based timing (Jacob's Equation from formula.md)
+      const layerHeight = layerHeightMm; // Cd in formula
+      const normalExposure = 2.5; // Average t for standard resin at 0.05mm
+      const bottomExposureMultiplier = 5; // 3-8x multiplier from formula.md
+      const bottomLayers = 5;
+      const liftRetractTime = 8; // Mechanical overhead per layer (lift + retract)
+      
+      const layerCount = Math.ceil(size.z / layerHeight);
+      
+      // Time = (Normal Layers * (t + lift)) + (Bottom Layers * (t*multiplier + lift))
+      const totalExposureSeconds = (layerCount - bottomLayers) * (normalExposure + liftRetractTime) + 
+                                  (bottomLayers * (normalExposure * bottomExposureMultiplier + liftRetractTime));
+                                  
+      printTimeMinutes = Math.max(5, Math.round(totalExposureSeconds / 60));
     } else {
-      // FDM: Volumetric estimation based on path extrusion
+      // FDM: Volumetric estimation based on formula.md (Cura Logic)
       const nozzleDiameterMm = 0.4;
-      const extrusionAreaMm2 = nozzleDiameterMm * layerHeightMm;
-      const totalVolumeMm3 = totalWeightGrams / material.densityGcm3 * 1000;
+      const lineWidthMultiplier = 1.05; // Standard Cura default
+      const lineWidth = nozzleDiameterMm * lineWidthMultiplier;
+      const filamentArea = Math.PI * Math.pow(FILAMENT_DIAMETER_MM / 2, 2);
       
+      // Calculate travel distance (L_travel) for shells and infill
+      // Shells: surface area / layer height / nozzle diameter * shellCount
+      const shellPathMm = (surfaceAreaCm2 * 100) * (input.infill.shellCount || 2);
+      
+      // Infill: line_spacing = line_width / (infill_density / 100)
+      const infillDensity = Math.max(1, input.infill.percentage) / 100;
+      const infillPathMm = (effectiveVolumeCm3 * 1000) / (lineWidth * layerHeightMm);
+
+      const totalTravelMm = shellPathMm + infillPathMm;
+      
+      // E = (line_width * layer_height * travel_distance) / filament_area
+      const extrusionVolumeMm3 = (lineWidth * layerHeightMm * totalTravelMm);
+      const filamentLengthMm = extrusionVolumeMm3 / filamentArea;
+      finalFilamentLengthM = filamentLengthMm / 1000;
+      
+      // Update print time using travel speed
       const printSpeedMms = Math.max(1, Math.min(material.maxSpeedMms, 60));
-      // Time = Volume / (Speed * ExtrusionArea)
-      // We add a 30% complexity factor for travel, retracts, and perimeters
-      const extrusionTimeSeconds = (totalVolumeMm3 / (printSpeedMms * extrusionAreaMm2)) * 1.3;
+      const extrusionTimeSeconds = totalTravelMm / printSpeedMms;
       
-      // Add machine overhead: 10 minutes for heating, leveling, and purge
+      // Add retraction overhead (E_retract) - approx 1.5s per 100mm of path
+      const retractionOverhead = (totalTravelMm / 100) * 1.5;
+      
       const setupOverheadMinutes = 10;
-      printTimeMinutes = Math.max(setupOverheadMinutes + 5, Math.round(extrusionTimeSeconds / 60) + setupOverheadMinutes);
+      printTimeMinutes = Math.max(setupOverheadMinutes + 5, Math.round((extrusionTimeSeconds + retractionOverhead) / 60) + setupOverheadMinutes);
     }
 
     const estimatedPrintTime = formatPrintTime(printTimeMinutes);
@@ -1012,7 +1041,7 @@ export class MaterialEstimationEngine {
       raftWeightGrams: +raftWeightGrams.toFixed(2),
       raftVolumeCm3: +raftVolumeCm3.toFixed(3),
       totalWeightGrams: +totalWeightGrams.toFixed(2),
-      filamentLengthM: +filamentLengthM.toFixed(2),
+      filamentLengthM: +finalFilamentLengthM.toFixed(2),
       materialCostUsd: +materialCostUsd.toFixed(4),
       estimatedPrintMinutes: printTimeMinutes,
       estimatedPrintTime,

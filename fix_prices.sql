@@ -35,8 +35,8 @@ ALTER TABLE public.materials
 
 -- ── Step 2: Add Y and W to app_settings ──────────────────────────────────────
 INSERT INTO public.app_settings (key, value) VALUES
-  ('material_multiplier_Y', '2.0'::jsonb),   -- Y: 2× material multiplier
-  ('run_time_multiplier_W', '1.25'::jsonb)   -- W: $1.25 per print-hour
+  ('material_multiplier_Y', '2.5'::jsonb),   -- Y: 2.5× material multiplier (Hardened)
+  ('run_time_multiplier_W', '5.0'::jsonb)   -- W: $5.00 per print-hour (Industry Standard)
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
 -- ── Step 3: Populate spool_cost (M) and spool_quantity (L/V) for all materials ─
