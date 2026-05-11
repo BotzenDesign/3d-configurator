@@ -955,7 +955,8 @@ export class MaterialEstimationEngine {
     }
 
     // 5. Waste factor (FDM only — purge lines, skirt; SLA resin waste is negligible)
-    const wasteMaterialGrams = isSLA ? 0 : (modelWeightGrams + supportWeightGrams + raftWeightGrams) * (WASTE_FACTOR - 1);
+    const safetyFactor = 1.15; // 15% safety buffer for real-world material overhead
+    const wasteMaterialGrams = isSLA ? 0 : (modelWeightGrams + supportWeightGrams + raftWeightGrams) * (WASTE_FACTOR * safetyFactor - 1);
     const totalWeightGrams = modelWeightGrams + supportWeightGrams + raftWeightGrams + wasteMaterialGrams;
 
     // 6. Filament length (FDM only)
@@ -1082,8 +1083,8 @@ export interface PricingConfig {
 
 const DEFAULT_CONFIG: PricingConfig = {
   // Overridden at runtime from app_settings table in Supabase.
-  materialMultiplierY: 2.0,   // Y: 2× material multiplier (client spec)
-  runTimeMultiplierW:  1.25,  // W: fixed run time multiplier (client spec)
+  materialMultiplierY: 2.5,   // Y: Increased to 2.5x for better overhead coverage
+  runTimeMultiplierW:  5.00,  // W: Increased to $5.00/hr (industry average for FDM/SLA)
   quantityDiscounts: [
     { minQty: 5,  discountPct: 5  },
     { minQty: 10, discountPct: 10 },

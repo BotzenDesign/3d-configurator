@@ -116,28 +116,27 @@ export default function DimensionOverlay({ boundingBox, visible = true, realDime
     const fmt = (real: number | null, scaled: number) =>
       real !== null ? `${real.toFixed(2)}mm` : `${scaled.toFixed(2)}mm`;
 
-    const offset = 8;
-
+    // Placement: Flushed to the bounding box extents for "attachment" feel
     return {
       x: {
-        start: new THREE.Vector3(min.x, min.y - offset, max.z + offset),
-        end:   new THREE.Vector3(max.x, min.y - offset, max.z + offset),
+        start: new THREE.Vector3(min.x, min.y, max.z),
+        end:   new THREE.Vector3(max.x, min.y, max.z),
         label: fmt(realW, size.x),
-        labelPos: [(min.x + max.x) / 2, min.y - offset - 3, max.z + offset] as [number, number, number],
+        labelPos: [(min.x + max.x) / 2, min.y - 1, max.z + 1] as [number, number, number],
         color: "#ef4444",
       },
       y: {
-        start: new THREE.Vector3(min.x - offset, min.y, max.z + offset),
-        end:   new THREE.Vector3(min.x - offset, max.y, max.z + offset),
+        start: new THREE.Vector3(max.x, min.y, max.z),
+        end:   new THREE.Vector3(max.x, max.y, max.z),
         label: fmt(realH, size.y),
-        labelPos: [min.x - offset - 3, (min.y + max.y) / 2, max.z + offset] as [number, number, number],
+        labelPos: [max.x + 1, (min.y + max.y) / 2, max.z + 1] as [number, number, number],
         color: "#22c55e",
       },
       z: {
-        start: new THREE.Vector3(max.x + offset, min.y - offset, min.z),
-        end:   new THREE.Vector3(max.x + offset, min.y - offset, max.z),
+        start: new THREE.Vector3(max.x, min.y, min.z),
+        end:   new THREE.Vector3(max.x, min.y, max.z),
         label: fmt(realD, size.z),
-        labelPos: [max.x + offset + 3, min.y - offset - 3, (min.z + max.z) / 2] as [number, number, number],
+        labelPos: [max.x + 1, min.y - 1, (min.z + max.z) / 2] as [number, number, number],
         color: "#3b82f6",
       },
     };
