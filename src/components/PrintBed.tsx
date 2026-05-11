@@ -25,7 +25,7 @@ export default function PrintBed({ printType = "FDM" }: PrintBedProps) {
       {/* Base platform */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[GRID_SIZE_X, GRID_SIZE_Z]} />
-        <meshStandardMaterial color="#3a3a3a" roughness={0.8} />
+        <meshStandardMaterial color="#555555" roughness={0.8} />
       </mesh>
       
       {/* Rectangular Grid Lines */}
@@ -55,7 +55,7 @@ export default function PrintBed({ printType = "FDM" }: PrintBedProps) {
       ].map((pos, i) => (
         <mesh key={i} position={pos as [number, number, number]} rotation={i < 2 ? [0, 0, 0] : [0, Math.PI / 2, 0]}>
           <boxGeometry args={[i < 2 ? GRID_SIZE_X : GRID_SIZE_Z, 1, 2]} />
-          <meshStandardMaterial color="#2a2a2a" />
+          <meshStandardMaterial color="#555555" />
         </mesh>
       ))}
 
