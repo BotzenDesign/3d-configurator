@@ -120,12 +120,60 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-center justify-center py-12 bg-black/20 rounded-3xl border border-white/5 shadow-2xl backdrop-blur-xl">
+      <div className="flex flex-col items-center justify-center py-10 bg-black/20 rounded-2xl border border-white/5 shadow-inner">
         <div className="flex items-start gap-2">
           <span className="text-3xl font-black text-primary/40 mt-4">$</span>
-          <span className="text-9xl font-black tracking-tighter text-primary drop-shadow-[0_0_40px_rgba(0,188,212,0.4)]">
+          <span className="text-8xl font-black tracking-tighter text-primary drop-shadow-[0_0_40px_rgba(0,188,212,0.4)]">
             {totalCost}
           </span>
+        </div>
+      </div>
+
+      <div className="space-y-4 pt-4 border-t border-white/5">
+        <div className="flex justify-between items-end">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-50">Formula Breakdown</span>
+          <span className="text-[9px] font-mono text-muted-foreground italic">Botzen Engine v2.1</span>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white/[0.03] rounded-xl p-3 space-y-2">
+            <div className="text-[10px] text-muted-foreground flex justify-between">
+              <span>Usage ({isSLA ? 'B' : 'A'})</span>
+              <span className="text-foreground font-medium">{quote.display.weight}</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground flex justify-between">
+              <span>Time (T)</span>
+              <span className="text-foreground font-medium">{quote.display.printTime}</span>
+            </div>
+          </div>
+          <div className="bg-white/[0.03] rounded-xl p-3 space-y-2">
+            <div className="text-[10px] text-muted-foreground flex justify-between">
+              <span>Multiplier (Y)</span>
+              <span className="text-foreground font-medium">x{quote.botzenVariables?.Y.toFixed(1) || '2.0'}</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground flex justify-between">
+              <span>Machine (W)</span>
+              <span className="text-foreground font-medium">${quote.botzenVariables?.W.toFixed(2)}/h</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white/[0.02] rounded-lg p-3 space-y-2">
+          {quote.lineItems.map((item, idx) => (
+            <div key={idx} className="flex flex-col gap-0.5">
+              <div className="flex justify-between text-[11px] font-medium">
+                <span className="text-foreground/80">{item.label}</span>
+                <span className="text-primary">${item.amountUsd.toFixed(2)}</span>
+              </div>
+              <div className="text-[9px] text-muted-foreground/40 font-mono truncate">{item.note}</div>
+            </div>
+          ))}
+          {quote.discountPct > 0 && (
+            <div className="pt-1 border-t border-white/5 flex justify-between text-[11px] font-bold text-emerald-400">
+              <span>Bulk Discount ({quote.discountPct}%)</span>
+              <span>-${quote.discountAmountUsd.toFixed(2)}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -985,12 +985,19 @@ export class MaterialEstimationEngine {
       const printTimeSeconds = layerCount * 31.2;
       printTimeMinutes = Math.max(5, Math.round(printTimeSeconds / 60));
     } else {
-      // FDM: nozzle travel based (0.2mm layers, 0.4mm nozzle)
-      const layerCount = size.z / layerHeightMm;
+      // FDM: Volumetric estimation based on path extrusion
+      const nozzleDiameterMm = 0.4;
+      const extrusionAreaMm2 = nozzleDiameterMm * layerHeightMm;
+      const totalVolumeMm3 = totalWeightGrams / material.densityGcm3 * 1000;
+      
       const printSpeedMms = Math.max(1, Math.min(material.maxSpeedMms, 60));
-      const avgLayerTravelMm = Math.sqrt(size.x * size.y) * (1 + fillRatio * 2);
-      const printTimeSeconds = (layerCount * avgLayerTravelMm) / printSpeedMms;
-      printTimeMinutes = Math.max(5, Math.round(printTimeSeconds / 60));
+      // Time = Volume / (Speed * ExtrusionArea)
+      // We add a 30% complexity factor for travel, retracts, and perimeters
+      const extrusionTimeSeconds = (totalVolumeMm3 / (printSpeedMms * extrusionAreaMm2)) * 1.3;
+      
+      // Add machine overhead: 10 minutes for heating, leveling, and purge
+      const setupOverheadMinutes = 10;
+      printTimeMinutes = Math.max(setupOverheadMinutes + 5, Math.round(extrusionTimeSeconds / 60) + setupOverheadMinutes);
     }
 
     const estimatedPrintTime = formatPrintTime(printTimeMinutes);
@@ -1255,8 +1262,8 @@ export class PricingService {
     } else {
       const filamentRadiusCm = (FILAMENT_DIAMETER_MM / 2) / 10;
       const areaCm2 = Math.PI * filamentRadiusCm * filamentRadiusCm;
-      // length = vol / area
-      const costPerCm3 = (M / Q) / areaCm2; // cost per cm³ of solid filament
+      // 1 meter = 100 cm. Volume of 1m = areaCm2 * 100
+      const costPerCm3 = (M / Q) / (areaCm2 * 100); 
       modelCost = modelMl * costPerCm3;
       supportRaftCost = (supportsMl + raftMl) * costPerCm3;
     }
@@ -1281,8 +1288,18 @@ export class PricingService {
         discount: discountPct > 0 ? `-${discountPct}% (${formatUsd(discountAmountUsd)})` : 'None',
         printTime: estimation.estimatedPrintTime,
         weight: isSLA
-          ? `${estimation.effectiveVolumeCm3.toFixed(1)} mL`
-          : `${estimation.totalWeightGrams.toFixed(1)}g`,
+          ? `${totalMl.toFixed(2)} mL`
+          : `${estimation.filamentLengthM.toFixed(2)}m`,
+      },
+      botzenVariables: {
+        Y,
+        M,
+        L: isSLA ? null : Q,
+        V: isSLA ? Q : null,
+        W,
+        T: estimation.estimatedPrintMinutes / 60,
+        A: isSLA ? null : estimation.filamentLengthM,
+        B: isSLA ? totalMl : null,
       },
       needsRepair,
       printabilityGrade: geometry.printability.grade,
@@ -1330,23 +1347,38 @@ async function parse3MFVertices(buffer: Uint8Array): Promise<Float32Array> {
 
   const xmlText = await modelFile.async("text");
   
+  // Detect units from the <model> tag
+  const unitMatch = xmlText.match(/<model[^>]*unit="([^"]+)"/i);
+  const unitStr = unitMatch ? unitMatch[1].toLowerCase() : "millimeter";
+  
+  let unitScale = 1.0;
+  switch (unitStr) {
+    case "micron":     unitScale = 0.001; break;
+    case "millimeter": unitScale = 1.0;   break;
+    case "centimeter": unitScale = 10.0;  break;
+    case "inch":       unitScale = 25.4;  break;
+    case "foot":       unitScale = 304.8; break;
+    case "meter":      unitScale = 1000.0;break;
+  }
+
   // Use a more memory-efficient approach by not storing all vertex objects
-  const vertexData = new Float32Array(xmlText.length / 10); // Rough pre-allocation
+  const vertexData = new Float32Array(xmlText.length / 8); // Rough pre-allocation
   let vertexCount = 0;
   
   // vertexRegex: match <vertex x="..." y="..." z="..." />
   const vertexRegex = /<vertex\s+[^>]*x="([^"]+)"[^>]*y="([^"]+)"[^>]*z="([^"]+)"/gi;
   let vMatch;
   while ((vMatch = vertexRegex.exec(xmlText)) !== null) {
-    if (vertexCount * 3 + 3 > vertexData.length) break; // Safety
-    vertexData[vertexCount * 3]     = parseFloat(vMatch[1]);
-    vertexData[vertexCount * 3 + 1] = parseFloat(vMatch[2]);
-    vertexData[vertexCount * 3 + 2] = parseFloat(vMatch[3]);
+    if (vertexCount * 3 + 3 > vertexData.length) break; 
+    vertexData[vertexCount * 3]     = parseFloat(vMatch[1]) * unitScale;
+    vertexData[vertexCount * 3 + 1] = parseFloat(vMatch[2]) * unitScale;
+    vertexData[vertexCount * 3 + 2] = parseFloat(vMatch[3]) * unitScale;
     vertexCount++;
   }
 
-  // Triangle parsing - use a pre-allocated Float32Array to avoid memory spikes from standard arrays
-  const positions = new Float32Array(vertexCount * 12); // Heuristic: 4 triangles per vertex
+  // Triangle parsing - use a larger buffer or dynamic growth
+  // 3MF usually has triangle count ~ 2x vertex count
+  const positions = new Float32Array(vertexCount * 18); 
   let posIdx = 0;
   
   const triangleRegex = /<triangle\s+[^>]*v1="([^"]+)"[^>]*v2="([^"]+)"[^>]*v3="([^"]+)"/gi;
@@ -1357,7 +1389,7 @@ async function parse3MFVertices(buffer: Uint8Array): Promise<Float32Array> {
     const v3 = parseInt(tMatch[3], 10);
     
     if (v1 < vertexCount && v2 < vertexCount && v3 < vertexCount) {
-      if (posIdx + 9 > positions.length) break; // Safety
+      if (posIdx + 9 > positions.length) break; 
       
       positions[posIdx++] = vertexData[v1*3]; positions[posIdx++] = vertexData[v1*3+1]; positions[posIdx++] = vertexData[v1*3+2];
       positions[posIdx++] = vertexData[v2*3]; positions[posIdx++] = vertexData[v2*3+1]; positions[posIdx++] = vertexData[v2*3+2];

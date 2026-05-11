@@ -50,6 +50,16 @@ export interface QuoteResult {
     supportRaftCost: number;
     totalMaterialCost: number;
   };
+  botzenVariables?: {
+    Y: number;
+    M: number;
+    L: number | null;
+    V: number | null;
+    W: number;
+    T: number;
+    A: number | null;
+    B: number | null;
+  };
 }
 
 export interface UseQuoteOptions {
