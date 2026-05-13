@@ -119,17 +119,7 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
   const totalCost = (quote?.totalUsd ?? 0).toFixed(2);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col items-center justify-center py-10 bg-black/20 rounded-2xl border border-white/5 shadow-inner">
-        <div className="flex items-start gap-2">
-          <span className="text-3xl font-black text-primary/40 mt-4">$</span>
-          <span className="text-8xl font-black tracking-tighter text-primary drop-shadow-[0_0_40px_rgba(0,188,212,0.4)]">
-            {totalCost}
-          </span>
-        </div>
-      </div>
-
-      <div className="space-y-4 pt-4 border-t border-white/5">
+    <div className="space-y-4">
         <div className="flex justify-between items-end">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-50">Formula Breakdown</span>
           <div className="flex flex-col items-end gap-0.5">
@@ -180,7 +170,6 @@ export default function PriceBreakdown({ quote, isLoading, error, hasFile, model
               <span>-${quote.discountAmountUsd.toFixed(2)}</span>
             </div>
           )}
-        </div>
       </div>
     </div>
   );

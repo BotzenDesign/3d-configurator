@@ -28,23 +28,7 @@ export default function PrintBed({ printType = "FDM" }: PrintBedProps) {
         <meshStandardMaterial color="#555555" roughness={0.8} />
       </mesh>
       
-      {/* Rectangular Grid Lines */}
-      <group position={[0, 0.01, 0]}>
-        {/* Horizontal lines */}
-        {Array.from({ length: Math.floor(GRID_SIZE_Z / 10) + 1 }).map((_, i) => (
-          <mesh key={`h-${i}`} position={[0, 0, (i * 10) - (GRID_SIZE_Z / 2)]}>
-            <boxGeometry args={[GRID_SIZE_X, 0.05, 0.1]} />
-            <meshBasicMaterial color="#555555" transparent opacity={0.3} />
-          </mesh>
-        ))}
-        {/* Vertical lines */}
-        {Array.from({ length: Math.floor(GRID_SIZE_X / 10) + 1 }).map((_, i) => (
-          <mesh key={`v-${i}`} position={[(i * 10) - (GRID_SIZE_X / 2), 0, 0]}>
-            <boxGeometry args={[0.1, 0.05, GRID_SIZE_Z]} />
-            <meshBasicMaterial color="#555555" transparent opacity={0.3} />
-          </mesh>
-        ))}
-      </group>
+      {/* Grid Lines Removed for Cleaner Viewport */}
       
       {/* Raised edges */}
       {[
@@ -61,35 +45,31 @@ export default function PrintBed({ printType = "FDM" }: PrintBedProps) {
 
       {/* Corner Dimension Labels */}
       <Html position={[GRID_SIZE_X / 2, 2, GRID_SIZE_Z / 2]} center style={{ pointerEvents: "none" }}>
-        <div className="bg-black border-2 border-red-500 rounded-md px-3 py-1 shadow-2xl">
-          <span className="text-[12px] font-black text-white whitespace-nowrap">
-            {GRID_SIZE_X} x {GRID_SIZE_Z} mm
-          </span>
+        <div style={{ background: "rgba(10, 10, 15, 0.85)", backdropFilter: "blur(8px)", border: `1px solid #ffffff40`, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600, color: "#ffffff", fontFamily: "'Inter', -apple-system, sans-serif", whiteSpace: "nowrap", letterSpacing: "0.02em", boxShadow: `0 0 12px #ffffff15` }}>
+          {GRID_SIZE_X} x {GRID_SIZE_Z} mm
         </div>
       </Html>
 
       <Html position={[-GRID_SIZE_X / 2, 1, GRID_SIZE_Z / 2]} center style={{ pointerEvents: "none" }}>
-        <div className="bg-black/80 backdrop-blur-sm border border-white/20 rounded px-2 py-0.5 shadow-lg">
-          <span className="text-[10px] font-bold text-white/60">Max X: {GRID_SIZE_X}mm</span>
+        <div style={{ background: "rgba(10, 10, 15, 0.85)", backdropFilter: "blur(8px)", border: `1px solid #ef444440`, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600, color: "#ef4444", fontFamily: "'Inter', -apple-system, sans-serif", whiteSpace: "nowrap", letterSpacing: "0.02em", boxShadow: `0 0 12px #ef444415` }}>
+          Max L: {GRID_SIZE_X}mm
         </div>
       </Html>
 
       <Html position={[GRID_SIZE_X / 2, 1, -GRID_SIZE_Z / 2]} center style={{ pointerEvents: "none" }}>
-        <div className="bg-black/80 backdrop-blur-sm border border-white/20 rounded px-2 py-0.5 shadow-lg">
-          <span className="text-[10px] font-bold text-white/60">Max Z: {GRID_SIZE_Z}mm</span>
+        <div style={{ background: "rgba(10, 10, 15, 0.85)", backdropFilter: "blur(8px)", border: `1px solid #3b82f640`, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600, color: "#3b82f6", fontFamily: "'Inter', -apple-system, sans-serif", whiteSpace: "nowrap", letterSpacing: "0.02em", boxShadow: `0 0 12px #3b82f615` }}>
+          Max W: {GRID_SIZE_Z}mm
         </div>
       </Html>
 
       {/* Height Indicator on the back corner */}
       <Html position={[-GRID_SIZE_X / 2, vol.h / 2, -GRID_SIZE_Z / 2]} center style={{ pointerEvents: "none" }}>
         <div className="flex flex-col items-center gap-1">
-          <div className="h-10 w-0.5 bg-red-500/50" />
-          <div className="bg-red-600 border border-red-400 rounded-md px-3 py-1 shadow-2xl">
-            <span className="text-[11px] font-black text-white whitespace-nowrap uppercase tracking-wider">
-              H: {vol.h}mm
-            </span>
+          <div className="h-10 w-0.5 bg-[#22c55e]/50" />
+          <div style={{ background: "rgba(10, 10, 15, 0.85)", backdropFilter: "blur(8px)", border: `1px solid #22c55e40`, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600, color: "#22c55e", fontFamily: "'Inter', -apple-system, sans-serif", whiteSpace: "nowrap", letterSpacing: "0.02em", boxShadow: `0 0 12px #22c55e15` }}>
+            Max H: {vol.h}mm
           </div>
-          <div className="h-10 w-0.5 bg-red-500/50" />
+          <div className="h-10 w-0.5 bg-[#22c55e]/50" />
         </div>
       </Html>
     </group>

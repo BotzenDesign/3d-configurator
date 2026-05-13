@@ -102,14 +102,14 @@ export default function DimensionOverlay({ boundingBox, visible = true, realDime
     // Parse real dimensions from STL parser if provided
     // Format: "102mm x 152mm x 155mm"  →  [W, H, D]
     let realW: number | null = null;
+    let realL: number | null = null;
     let realH: number | null = null;
-    let realD: number | null = null;
     if (realDimensions) {
       const parts = realDimensions.replace(/mm/gi, '').split(/\s*x\s*/i);
       if (parts.length === 3) {
-        realW = parseFloat(parts[0]);
-        realH = parseFloat(parts[1]);
-        realD = parseFloat(parts[2]);
+        realW = parseFloat(parts[0]); // X
+        realL = parseFloat(parts[1]); // Z
+        realH = parseFloat(parts[2]); // Y
       }
     }
 
@@ -135,7 +135,7 @@ export default function DimensionOverlay({ boundingBox, visible = true, realDime
       z: {
         start: new THREE.Vector3(max.x, min.y, min.z),
         end:   new THREE.Vector3(max.x, min.y, max.z),
-        label: fmt(realD, size.z),
+        label: fmt(realL, size.z),
         labelPos: [max.x + 1, min.y - 1, (min.z + max.z) / 2] as [number, number, number],
         color: "#3b82f6",
       },
@@ -146,7 +146,7 @@ export default function DimensionOverlay({ boundingBox, visible = true, realDime
 
   return (
     <group>
-      {/* X Dimension (Width) */}
+      {/* X Dimension (Length) */}
       <DimensionLine
         start={dimensions.x.start}
         end={dimensions.x.end}
@@ -154,7 +154,7 @@ export default function DimensionOverlay({ boundingBox, visible = true, realDime
       />
       <DimensionLabel
         position={dimensions.x.labelPos}
-        text={`W: ${dimensions.x.label}`}
+        text={`L: ${dimensions.x.label}`}
         color={dimensions.x.color}
       />
 
@@ -170,7 +170,7 @@ export default function DimensionOverlay({ boundingBox, visible = true, realDime
         color={dimensions.y.color}
       />
 
-      {/* Z Dimension (Depth) */}
+      {/* Z Dimension (Width) */}
       <DimensionLine
         start={dimensions.z.start}
         end={dimensions.z.end}
@@ -178,7 +178,7 @@ export default function DimensionOverlay({ boundingBox, visible = true, realDime
       />
       <DimensionLabel
         position={dimensions.z.labelPos}
-        text={`D: ${dimensions.z.label}`}
+        text={`W: ${dimensions.z.label}`}
         color={dimensions.z.color}
       />
     </group>

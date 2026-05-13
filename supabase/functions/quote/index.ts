@@ -1255,8 +1255,16 @@ export class PricingService {
       note: `W(${W}) × ${estimation.estimatedPrintTime} (${T.toFixed(2)}h)`,
     });
 
-    // ── 3. Unit Price ────────────────────────────────────────────────────────
-    const rawUnit = materialCost + machineCost;
+    // ── 3. Setup & Handling Fee ──────────────────────────────────────────────
+    const setupFeeUsd = 15.00;
+    lineItems.push({
+      label: 'Setup & Processing',
+      amountUsd: setupFeeUsd,
+      note: 'Standard machine prep & QA',
+    });
+
+    // ── 4. Unit Price ────────────────────────────────────────────────────────
+    const rawUnit = materialCost + machineCost + setupFeeUsd;
     const unitPriceUsd = rawUnit;
 
     // ── 4. Quantity Discount ─────────────────────────────────────────────────
