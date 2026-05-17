@@ -1,0 +1,41 @@
+name = "Polar 3D Configurator"
+client_id = "8fab72695fff15d9c4461ab2964ff18f"
+application_url = "https://unmasking-ship-shiftless.ngrok-free.dev"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[access_scopes]
+# Draft orders for dynamic pricing checkout, orders for history view
+scopes = "write_draft_orders,read_orders,read_customers"
+
+[auth]
+redirect_urls = [
+  "https://unmasking-ship-shiftless.ngrok-free.dev/auth/callback",
+  "https://unmasking-ship-shiftless.ngrok-free.dev/auth/shopify/callback",
+  "https://unmasking-ship-shiftless.ngrok-free.dev/exitiframe",
+]
+
+[webhooks]
+api_version = "2025-04"
+
+# Mandatory GDPR webhooks required for App Store submission
+[webhooks.privacy_compliance]
+customer_data_request_url = "/webhooks/gdpr/data-request"
+customer_deletion_url = "/webhooks/gdpr/customer-deletion"
+shop_deletion_url = "/webhooks/gdpr/shop-deletion"
+
+[[webhooks.subscriptions]]
+topics = ["orders/create"]
+uri = "/webhooks/orders/create"
+
+[pos]
+embedded = false
+
+[app_proxy]
+url = "https://unmasking-ship-shiftless.ngrok-free.dev/api"
+subpath = "polar3d"
+prefix = "apps"
+
+# App extensions are declared separately via shopify.extension.toml

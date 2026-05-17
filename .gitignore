@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 .env.example
+.env
+.env.*
 *.pdf
 
 # Editor directories and files
@@ -26,3 +28,5 @@ dist-ssr
 *.sw?
 
 .vercel
+
+uploads/

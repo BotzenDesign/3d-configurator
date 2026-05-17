@@ -1,0 +1,10 @@
+api_version = "2025-04"
+uid = "538eb1a2-0226-7196-1e65-0310344d81d8d2fa5c2b"
+
+[[extensions]]
+type = "theme"
+name = "3D Configurator"
+handle = "3d-configurator"
+
+[extensions.development]
+root_dir = "."

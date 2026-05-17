@@ -26,7 +26,7 @@ const DEFAULT_STATS = {
   weight: "55.00g",
 };
 
-export default function Index() {
+export default function Index({ isWidget = false, shopDomain = "" }: { isWidget?: boolean; shopDomain?: string }) {
   const [modelType, setModelType] = useState("bear");
   const [modelName, setModelName] = useState("bear.stl");
   const [color, setColor] = useState("#00bcd4");
@@ -109,9 +109,7 @@ export default function Index() {
   // ── Mobile Layout ──────────────────────────────────────────────────────
   if (isMobile) {
     return (
-      <div className="flex flex-col h-full overflow-hidden">
-        <Navbar />
-
+      <div className="flex flex-col h-screen overflow-hidden">
         {/* Tab switcher */}
         <div className="flex bg-panel-bg border-b border-border">
           <button
@@ -192,8 +190,7 @@ export default function Index() {
 
   // ── Desktop Layout ─────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <Navbar />
+    <div className="flex flex-col h-screen overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
         <ConfigPanel
           onFileUpload={handleFileUpload}

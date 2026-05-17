@@ -1,0 +1,16 @@
+node_modules/
+.env
+.cache/
+build/
+public/build/
+*.db
+*.db-journal
+.shopify/
+
+# Widget build output (copied to extension/assets)
+extensions/3d-configurator/assets/configurator.js
+extensions/3d-configurator/assets/configurator.css
+
+# OS
+.DS_Store
+Thumbs.db

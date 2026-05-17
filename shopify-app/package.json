@@ -1,0 +1,45 @@
+{
+  "name": "polar-3d-shopify-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Polar 3D Configurator — Shopify App for selling custom 3D prints with instant quoting",
+  "scripts": {
+    "build": "remix vite:build",
+    "dev": "shopify app dev",
+    "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
+    "start": "remix-serve ./build/server/index.js",
+    "docker-start": "npm start",
+    "widget:build": "vite build --config widget-src/vite.widget.config.ts",
+    "widget:dev": "vite build --config widget-src/vite.widget.config.ts --watch"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18.20"
+  },
+  "dependencies": {
+    "@remix-run/dev": "^2.13.1",
+    "@remix-run/node": "^2.13.1",
+    "@remix-run/react": "^2.13.1",
+    "@remix-run/serve": "^2.13.1",
+    "@shopify/app-bridge-react": "^4.1.6",
+    "@shopify/polaris": "^13.9.2",
+    "@shopify/shopify-app-remix": "^3.3.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "isbot": "^5.1.17",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@remix-run/eslint-config": "^2.13.1",
+    "@shopify/app": "^3.58.2",
+    "@shopify/cli": "^3.94.3",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^8.57.1",
+    "typescript": "^5.8.3",
+    "vite": "^5.4.11",
+    "vite-tsconfig-paths": "^6.1.1"
+  }
+}

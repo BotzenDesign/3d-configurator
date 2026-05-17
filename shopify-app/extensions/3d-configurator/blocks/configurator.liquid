@@ -1,0 +1,54 @@
+{% comment %}
+  Polar 3D Configurator Widget
+  This block renders the React widget for instant 3D printing quotes.
+{% endcomment %}
+
+<div 
+  id="polar-3d-root" 
+  class="polar-3d-widget-container"
+  data-shop="{{ shop.domain }}"
+  data-supabase-url="{{ block.settings.supabase_url }}"
+  data-supabase-key="{{ block.settings.supabase_anon_key }}"
+  data-accent-color="{{ block.settings.accent_color }}"
+  data-primary-button-text="{{ block.settings.button_text }}"
+>
+  <!-- React will mount here -->
+  <div style="padding: 40px; text-align: center; color: #666;">
+    Loading 3D Configurator...
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "3D Configurator",
+  "target": "section",
+  "stylesheet": "configurator.css",
+  "javascript": "configurator.js",
+  "settings": [
+    {
+      "type": "text",
+      "id": "supabase_url",
+      "label": "Supabase Project URL",
+      "info": "e.g., https://xyz.supabase.co"
+    },
+    {
+      "type": "text",
+      "id": "supabase_anon_key",
+      "label": "Supabase Anon Key",
+      "info": "Your public anon key"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent Color",
+      "default": "#0ea5e9"
+    },
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "Checkout Button Text",
+      "default": "Proceed to Checkout"
+    }
+  ]
+}
+{% endschema %}
