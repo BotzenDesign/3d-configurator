@@ -237,7 +237,7 @@ export default function AdminDashboard() {
   const materialRows = materials.map((mat) => {
     const unitRate =
       mat.spool_quantity > 0
-        ? `$${(Number(mat.spool_cost) / Number(mat.spool_quantity)).toFixed(4)}/${mat.type === "SLA" ? "mL" : "m"}`
+        ? `$${(Number(mat.spool_cost) / Number(mat.spool_quantity)).toFixed(4)}/g`
         : "—";
     return [
       <Badge tone={mat.type === "SLA" ? "attention" : "info"} key="type">
@@ -251,7 +251,7 @@ export default function AdminDashboard() {
         </Text>
       </Text>,
       `$${Number(mat.spool_cost).toFixed(2)}`,
-      `${Number(mat.spool_quantity).toFixed(0)} ${mat.type === "SLA" ? "mL" : "m"}`,
+      `${Number(mat.spool_quantity).toFixed(0)} g`,
       unitRate,
       Array.isArray(mat.colors) ? mat.colors.join(", ") : mat.colors,
       <Badge key="status" tone={mat.is_active ? "success" : "critical"}>
@@ -285,7 +285,7 @@ export default function AdminDashboard() {
   // ── Setting descriptions ─────────────────────────────────────────────────
   const settingDescriptions = {
     material_multiplier_Y:
-      "Y — Material cost multiplier (e.g. 2.0 = 2× the raw material cost). Used in Botzen Formula: FDM = (Y×M/L×A) + W×T",
+      "Y — Material cost multiplier (e.g. 2.0 = 2× the raw material cost). Used in Botzen Formula: Price = (Y×M/Q×B) + W×T",
     run_time_multiplier_W:
       "W — Machine run-time charge in $/hour (e.g. 1.25 = $1.25 per print-hour).",
     max_file_size_mb: "Maximum upload file size for STL/OBJ/3MF in megabytes.",
@@ -339,11 +339,10 @@ export default function AdminDashboard() {
                 <Banner tone="info">
                   <Text>
                     Botzen Formula:{" "}
-                    <strong>FDM = (Y × M/L × A) + W × T</strong> &nbsp;|&nbsp;{" "}
-                    <strong>SLA = (Y × M/V × B) + W × T</strong>
+                    <strong>Price = (Y × M/Q × B) + W × T</strong>
                     <br />
-                    M = Spool Cost, L = Spool Length (m), V = Bottle Volume (mL),
-                    A/B = filament/resin consumed, Y = material multiplier, W =
+                    M = Spool/Bottle Cost, Q = Material Quantity (g),
+                    B = material consumed (g), Y = material multiplier, W =
                     run-time $/hr, T = print time (hrs)
                   </Text>
                 </Banner>
@@ -365,7 +364,7 @@ export default function AdminDashboard() {
                       "text","text","numeric","numeric","numeric","text","text","text",
                     ]}
                     headings={[
-                      "Type","Name","M — Spool Cost","L/V — Qty","Unit Rate","Colors","Status","Actions",
+                      "Type","Name","M — Spool Cost","Qty (g)","Unit Rate","Colors","Status","Actions",
                     ]}
                     rows={materialRows}
                     hoverable
@@ -457,11 +456,9 @@ export default function AdminDashboard() {
                 <Text>
                   Formula:{" "}
                   <strong>
-                    {currentMaterial.type === "SLA"
-                      ? "Y × M/V × B"
-                      : "Y × M/L × A"}
+                    Y × M/Q × B
                   </strong>
-                  &nbsp;— Set M (spool cost) and L/V (quantity) below.
+                  &nbsp;— Set M (cost) and Q (quantity in grams) below.
                 </Text>
               </Banner>
 
@@ -530,11 +527,7 @@ export default function AdminDashboard() {
                   autoComplete="off"
                 />
                 <TextField
-                  label={
-                    currentMaterial.type === "SLA"
-                      ? "V — Bottle Volume (mL)"
-                      : "L — Spool Length (meters)"
-                  }
+                  label="Q — Material Quantity (grams)"
                   type="number"
                   value={String(currentMaterial.spool_quantity)}
                   onChange={(v) =>
@@ -543,12 +536,8 @@ export default function AdminDashboard() {
                       spool_quantity: v,
                     })
                   }
-                  suffix={currentMaterial.type === "SLA" ? "mL" : "m"}
-                  helpText={
-                    currentMaterial.type === "SLA"
-                      ? "Total resin volume per bottle (e.g. 1000 for 1L)"
-                      : "Total filament length on spool (e.g. 335m for 1kg PLA)"
-                  }
+                  suffix="g"
+                  helpText="Total quantity of material in grams (e.g., 1000g for a 1kg package)"
                   autoComplete="off"
                 />
               </FormLayout.Group>
@@ -556,15 +545,14 @@ export default function AdminDashboard() {
               {Number(currentMaterial.spool_quantity) > 0 && (
                 <Banner tone="success">
                   <Text>
-                    Unit rate (M/{currentMaterial.type === "SLA" ? "V" : "L"}
-                    ):{" "}
+                    Unit rate (M/Q):{" "}
                     <strong>
                       $
                       {(
                         Number(currentMaterial.spool_cost) /
                         Number(currentMaterial.spool_quantity)
                       ).toFixed(5)}
-                      /{currentMaterial.type === "SLA" ? "mL" : "m"}
+                      /g
                     </strong>
                   </Text>
                 </Banner>
