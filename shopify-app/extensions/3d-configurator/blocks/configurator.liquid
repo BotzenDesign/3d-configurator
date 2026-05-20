@@ -1,20 +1,25 @@
 {% comment %}
-  Polar 3D Configurator Widget
-  This block renders the React widget for instant 3D printing quotes.
+  Polar 3D Configurator Widget — Iframe Edition
+  The full React widget is hosted externally; this block is just a lightweight loader.
 {% endcomment %}
 
 <div 
   id="polar-3d-root" 
   class="polar-3d-widget-container"
   data-shop="{{ shop.domain }}"
+  data-widget-url="{{ block.settings.widget_url }}"
   data-supabase-url="{{ block.settings.supabase_url }}"
   data-supabase-key="{{ block.settings.supabase_anon_key }}"
   data-accent-color="{{ block.settings.accent_color }}"
   data-primary-button-text="{{ block.settings.button_text }}"
+  data-height="{{ block.settings.height }}"
 >
-  <!-- React will mount here -->
-  <div style="padding: 40px; text-align: center; color: #666;">
-    Loading 3D Configurator...
+  <!-- iframe will be injected by configurator.js -->
+  <div style="padding:40px;text-align:center;color:#666;font-family:sans-serif;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 12px;display:block;opacity:.4">
+      <path d="m21 16-9 5-9-5V8l9-5 9 5z"/><path d="M3 8l9 5 9-5M12 13v8"/>
+    </svg>
+    Loading 3D Configurator…
   </div>
 </div>
 
@@ -25,6 +30,12 @@
   "stylesheet": "configurator.css",
   "javascript": "configurator.js",
   "settings": [
+    {
+      "type": "text",
+      "id": "widget_url",
+      "label": "Widget Hosted URL",
+      "info": "The full URL where your 3D configurator app is hosted (e.g. https://yourapp.vercel.app)"
+    },
     {
       "type": "text",
       "id": "supabase_url",
@@ -48,6 +59,15 @@
       "id": "button_text",
       "label": "Checkout Button Text",
       "default": "Proceed to Checkout"
+    },
+    {
+      "type": "range",
+      "id": "height",
+      "label": "Widget Height (px)",
+      "min": 600,
+      "max": 1200,
+      "step": 20,
+      "default": 860
     }
   ]
 }
