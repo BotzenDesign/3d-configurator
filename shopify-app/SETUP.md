@@ -66,12 +66,42 @@ Once installed, open the App in your Shopify Admin. You will see the **Polaris U
    - Pick your brand's accent color.
 5. Save the theme. Customers can now upload 3D models and get instant quotes.
 
-## 4. Production Deployment
+## 4. Production Deployment on Railway
 
-When you are ready to hand this off or deploy for a client:
-1. **Host the App**: Deploy the `shopify-app/` directory to a Node.js host (like Render, Railway, or Heroku).
-2. **App Proxy**: Ensure the App Proxy is configured in your Shopify Partner Dashboard (Subpath: `polar3d`, Prefix: `apps`, Proxy URL: `https://your-production-url.com/api`).
-3. **Deploy Extensions**: Run `npm run deploy` via Shopify CLI to push the Theme App Extension to Shopify's CDN.
+Follow these steps to deploy the Shopify app backend to Railway:
+
+### Step 4.1: Prepare your Railway Project
+1. Log in to your **[Railway Dashboard](https://railway.app)**.
+2. Click **+ New Project** → **Deploy from GitHub repo**.
+3. Choose the `3d-configurator` repository.
+4. Set the **Root Directory** settings under the Service config to: `/shopify-app` (since the Shopify app server lives in the `shopify-app` subdirectory).
+
+### Step 4.2: Configure Railway Environment Variables
+Add the following variables under the **Variables** tab in your Railway service:
+- `SHOPIFY_API_KEY`: Your Client ID from the Shopify Partner Dashboard.
+- `SHOPIFY_API_SECRET`: Your Client Secret.
+- `APP_URL`: Your public Railway URL (e.g., `https://your-app.up.railway.app`). **Do not use a `.railway.internal` URL.**
+- `SUPABASE_URL`: Your Supabase Project URL.
+- `SUPABASE_ANON_KEY`: Your Supabase Anon/Public Key.
+- `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase Service Role Key (used securely on the server-side to bypass RLS).
+- `SCOPES`: `write_draft_orders,read_orders,read_customers`
+- `NODE_ENV`: `production`
+
+### Step 4.3: Update and Push App URL Configuration
+1. Open the file `shopify.app.production.toml` in your editor.
+2. Replace all instances of `https://YOUR-RAILWAY-APP-NAME.up.railway.app` with your actual public Railway app URL.
+3. In your terminal, run the following commands to set and push this production configuration to Shopify's servers:
+   ```bash
+   npx shopify app config use shopify.app.production.toml
+   npx shopify app config push
+   ```
+
+### Step 4.4: Deploy Extensions
+Run the deploy command via Shopify CLI to push your Theme App Extension (the storefront widget iframe loader) to Shopify's CDN:
+```bash
+npx shopify app deploy
+```
+
 
 ## 5. Security Notes
 - The Shopify Admin API token is **never** sent to the frontend.

@@ -1,0 +1,43 @@
+# shopify.app.production.toml
+# Production configuration file for Polar 3D Configurator on Railway
+
+name = "Polar 3D Configurator"
+client_id = "8fab72695fff15d9c4461ab2964ff18f"
+
+# IMPORTANT: Replace YOUR-RAILWAY-APP-NAME below with your public Railway domain.
+# Do NOT use a .railway.internal domain here, as Shopify requires a public URL.
+application_url = "https://YOUR-RAILWAY-APP-NAME.up.railway.app"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = false
+
+[access_scopes]
+scopes = "write_draft_orders,read_orders,read_customers"
+
+[auth]
+redirect_urls = [
+  "https://YOUR-RAILWAY-APP-NAME.up.railway.app/auth/callback",
+  "https://YOUR-RAILWAY-APP-NAME.up.railway.app/auth/shopify/callback",
+  "https://YOUR-RAILWAY-APP-NAME.up.railway.app/exitiframe",
+]
+
+[webhooks]
+api_version = "2025-04"
+
+[webhooks.privacy_compliance]
+customer_data_request_url = "/webhooks/gdpr/data-request"
+customer_deletion_url = "/webhooks/gdpr/customer-deletion"
+shop_deletion_url = "/webhooks/gdpr/shop-deletion"
+
+[[webhooks.subscriptions]]
+topics = ["orders/create"]
+uri = "/webhooks/orders/create"
+
+[pos]
+embedded = false
+
+[app_proxy]
+url = "https://YOUR-RAILWAY-APP-NAME.up.railway.app/api"
+subpath = "polar3d"
+prefix = "apps"
