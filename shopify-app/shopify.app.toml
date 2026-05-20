@@ -2,7 +2,7 @@
 
 client_id = "8fab72695fff15d9c4461ab2964ff18f"
 name = "3D Configurator"
-application_url = "https://3d-configurator.railway.internal"
+application_url = "https://3d-configurator-production-f8a7.up.railway.app"
 embedded = true
 
 [build]
@@ -35,13 +35,13 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://3d-configurator.railway.internal/auth/callback",
-  "https://3d-configurator.railway.internal/auth/shopify/callback",
-  "https://3d-configurator.railway.internal/exitiframe"
+  "https://3d-configurator-production-f8a7.up.railway.app/auth/callback",
+  "https://3d-configurator-production-f8a7.up.railway.app/auth/shopify/callback",
+  "https://3d-configurator-production-f8a7.up.railway.app/exitiframe"
 ]
 
 [app_proxy]
-url = "https://3d-configurator.railway.internal/api"
+url = "https://3d-configurator-production-f8a7.up.railway.app/api"
 subpath = "polar3d"
 prefix = "apps"
 
