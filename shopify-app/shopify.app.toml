@@ -1,41 +1,49 @@
-name = "Polar 3D Configurator"
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
 client_id = "8fab72695fff15d9c4461ab2964ff18f"
+name = "3D Configurator"
 application_url = "https://3d-configurator.railway.internal"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
 
+[webhooks]
+api_version = "2025-04"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/gdpr/customer-deletion"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/gdpr/data-request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/gdpr/shop-deletion"
+  compliance_topics = [ "shop/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/create"
+  topics = [ "orders/create" ]
+
 [access_scopes]
-# Draft orders for dynamic pricing checkout, orders for history view
-scopes = "write_draft_orders,read_orders,read_customers"
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,write_draft_orders,read_orders"
+optional_scopes = [ ]
+use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
   "https://3d-configurator.railway.internal/auth/callback",
   "https://3d-configurator.railway.internal/auth/shopify/callback",
-  "https://3d-configurator.railway.internal/exitiframe",
+  "https://3d-configurator.railway.internal/exitiframe"
 ]
-
-[webhooks]
-api_version = "2025-04"
-
-# Mandatory GDPR webhooks required for App Store submission
-[webhooks.privacy_compliance]
-customer_data_request_url = "/webhooks/gdpr/data-request"
-customer_deletion_url = "/webhooks/gdpr/customer-deletion"
-shop_deletion_url = "/webhooks/gdpr/shop-deletion"
-
-[[webhooks.subscriptions]]
-topics = ["orders/create"]
-uri = "/webhooks/orders/create"
-
-[pos]
-embedded = false
 
 [app_proxy]
 url = "https://3d-configurator.railway.internal/api"
 subpath = "polar3d"
 prefix = "apps"
 
-# App extensions are declared separately via shopify.extension.toml
+[pos]
+embedded = false
