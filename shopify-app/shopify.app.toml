@@ -2,7 +2,7 @@
 
 client_id = "8fab72695fff15d9c4461ab2964ff18f"
 name = "3D Configurator"
-application_url = "https://knr099-g3.myshopify.com"
+application_url = "https://3d-configurator.railway.internal"
 embedded = true
 
 [build]
@@ -35,13 +35,13 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://knr099-g3.myshopify.com/auth/callback",
-  "https://knr099-g3.myshopify.com/auth/shopify/callback",
-  "https://knr099-g3.myshopify.com/exitiframe"
+  "https://3d-configurator.railway.internal/auth/callback",
+  "https://3d-configurator.railway.internal/auth/shopify/callback",
+  "https://3d-configurator.railway.internal/exitiframe"
 ]
 
 [app_proxy]
-url = "https://knr099-g3.myshopify.com/api"
+url = "https://3d-configurator.railway.internal/api"
 subpath = "polar3d"
 prefix = "apps"
 
