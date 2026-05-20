@@ -14,7 +14,7 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=18.20"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "@remix-run/dev": "^2.13.1",
