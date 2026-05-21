@@ -49,6 +49,11 @@
     @apply border-border;
   }
 
+  html, body, #root {
+    @apply h-full w-full m-0 p-0 overflow-hidden;
+    height: 100dvh;
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
     font-family: 'Inter', sans-serif;
