@@ -14,12 +14,12 @@ interface ModelSelectorProps {
 
 export default function ModelSelector({ selected, onSelect, onUploadClick }: ModelSelectorProps) {
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 z-10">
+    <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex gap-2 sm:gap-3 z-10 w-[max-content] max-w-[95vw]">
       {PRESETS.map((m) => (
         <button
           key={m.id}
           onClick={() => onSelect(m.id)}
-          className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all ${
+          className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl transition-all shrink-0 ${
             selected === m.id
               ? "bg-primary/20 ring-2 ring-primary"
               : "bg-secondary/80 hover:bg-secondary"
@@ -31,14 +31,14 @@ export default function ModelSelector({ selected, onSelect, onUploadClick }: Mod
       ))}
       <button
         onClick={onUploadClick}
-        className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
+        className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all shrink-0 ${
           selected === "upload"
             ? "bg-primary/20 ring-2 ring-primary"
             : "bg-secondary/80 hover:bg-secondary"
         }`}
         title="Upload STL"
       >
-        <Upload size={22} className="text-muted-foreground" />
+        <Upload className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-muted-foreground" />
       </button>
     </div>
   );

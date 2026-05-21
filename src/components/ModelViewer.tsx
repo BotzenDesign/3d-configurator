@@ -300,7 +300,7 @@ function ViewerToolbar({
     }`;
 
   return (
-    <div className={`absolute z-20 flex gap-2 ${isMobile ? "bottom-[6.5rem] left-1/2 -translate-x-1/2 flex-row" : "top-4 left-4 flex-col"}`}>
+    <div className={`absolute z-20 flex gap-2 ${isMobile ? "top-20 left-2 flex-col" : "top-4 left-4 flex-col"}`}>
       <button className={btnClass(showDimensions)} onClick={onToggleDimensions} title="Toggle dimensions">
         📏
       </button>
