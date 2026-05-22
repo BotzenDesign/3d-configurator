@@ -383,7 +383,7 @@ export default function ModelViewer({ modelType, color, geometry, printType = "F
           camera={{ position: [120, 80, 120], fov: 50 }}
           gl={{
             antialias: device.gpuTier !== "low",
-            alpha: false,
+            alpha: true,
             powerPreference: device.lowPowerMode ? "low-power" : "high-performance",
             stencil: false,
             depth: true,
