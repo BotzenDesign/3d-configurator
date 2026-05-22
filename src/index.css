@@ -5,6 +5,7 @@
 @tailwind utilities;
 @layer base {
   :root {
+    /* Left panel — stays white/light */
     --background: 0 0% 100%;
     --foreground: 0 0% 0%;
 
@@ -36,11 +37,20 @@
     --radius: 0.5rem;
 
     --panel-bg: 0 0% 100%;
-    --viewer-bg: 0 0% 96%;
+    /* Viewer area — restored dark */
+    --viewer-bg: 220 13% 9%;
     --price-color: 0 0% 0%;
     --config-label: 0 0% 40%;
     --config-value: 0 0% 0%;
     --bed-color: 0 0% 85%;
+
+    /* Viewer-specific dark overrides (used via .viewer-dark scope) */
+    --viewer-card: 220 13% 14%;
+    --viewer-card-border: 220 13% 22%;
+    --viewer-text: 0 0% 95%;
+    --viewer-text-muted: 0 0% 60%;
+    --viewer-btn-bg: 220 13% 18%;
+    --viewer-btn-hover: 220 13% 24%;
   }
 }
 
