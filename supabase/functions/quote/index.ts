@@ -966,17 +966,10 @@ export class MaterialEstimationEngine {
     const filamentLengthM = filamentLengthCm / 100;
 
     // 7. Material cost
-    // FDM: cost = weight_grams × cost_per_gram  (e.g. 96g × $0.0667/g = $6.40)
-    // SLA: cost = volume_mL   × cost_per_mL     (e.g. 86.24mL × $0.089/mL = $7.68)
-    let materialCostUsd: number;
-    if (isSLA) {
-      // SLA: volume-based pricing (1 cm³ = 1 mL)
-      const totalVolumeMl = effectiveVolumeCm3 + supportVolumeCm3 + raftVolumeCm3;
-      materialCostUsd = totalVolumeMl * material.costPerGram; // costPerGram = cost_per_mL for SLA
-    } else {
-      // FDM: weight-based pricing
-      materialCostUsd = totalWeightGrams * material.costPerGram;
-    }
+    // Strictly weight-based in grams for both (volume only in grams)
+    const costPerGram = material.spoolQuantity > 0 ? (material.spoolCost / material.spoolQuantity) : material.costPerGram;
+    const materialCostUsd = totalWeightGrams * costPerGram;
+
 
     // 7. Print time estimate
     let printTimeMinutes = 0;
@@ -1219,26 +1212,15 @@ export class PricingService {
     const Y = config.materialMultiplierY;  // material multiplier
     const W = config.runTimeMultiplierW;   // run-time multiplier ($/hr)
     const M = mat.spoolCost;               // purchase price of spool/bottle
-    const Q = mat.spoolQuantity;           // L (meters) for FDM, V (mL) for SLA
+    const Q = mat.spoolQuantity;           // spool/bottle weight in grams
     const T = estimation.estimatedPrintMinutes / 60; // print time in hours
 
     // ── 1. Material Cost ─────────────────────────────────────────────────────
-    // FDM: Y × (M/L) × A  where A = filament meters used
-    // SLA: Y × (M/V) × B  where B = resin mL used (1 cm³ = 1 mL)
-    let materialCost: number;
-    let materialNote: string;
-
-    if (isSLA) {
-      const B = estimation.effectiveVolumeCm3 + (estimation.supportWeightGrams / mat.densityGcm3) + estimation.raftVolumeCm3; // Total mL used
-      const costPerMl = M / Q;                 // M/V
-      materialCost = Y * costPerMl * B;        // Y × M/V × B
-      materialNote = `Y(${Y}) × $${M}/${Q}mL × ${B.toFixed(2)}mL (Total)`;
-    } else {
-      const A = estimation.filamentLengthM;    // A: meters of filament used (already includes support/raft in estimate())
-      const costPerMeter = M / Q;              // M/L
-      materialCost = Y * costPerMeter * A;    // Y × M/L × A
-      materialNote = `Y(${Y}) × $${M}/${Q}m × ${A.toFixed(2)}m (Total)`;
-    }
+    // For both FDM and SLA: Y × (M/Q) × totalWeightGrams  where totalWeightGrams = printed weight in grams
+    const totalWeightGrams = estimation.totalWeightGrams;
+    const costPerGram = Q > 0 ? M / Q : mat.costPerGram;
+    const materialCost = Y * costPerGram * totalWeightGrams;
+    const materialNote = `Y(${Y}) × $${M}/${Q}g × ${totalWeightGrams.toFixed(2)}g (Total)`;
 
     lineItems.push({
       label: `Material — ${mat.name}`,
@@ -1296,18 +1278,8 @@ export class PricingService {
     let supportRaftCost = 0;
     let totalMaterialCost = 0;
 
-    if (isSLA) {
-      const costPerMl = M / Q; // $ per mL
-      modelCost = modelMl * costPerMl;
-      supportRaftCost = (supportsMl + raftMl) * costPerMl;
-    } else {
-      const filamentRadiusCm = (FILAMENT_DIAMETER_MM / 2) / 10;
-      const areaCm2 = Math.PI * filamentRadiusCm * filamentRadiusCm;
-      // 1 meter = 100 cm. Volume of 1m = areaCm2 * 100
-      const costPerCm3 = (M / Q) / (areaCm2 * 100); 
-      modelCost = modelMl * costPerCm3;
-      supportRaftCost = (supportsMl + raftMl) * costPerCm3;
-    }
+    modelCost = estimation.weightGrams * costPerGram;
+    supportRaftCost = (estimation.supportWeightGrams + estimation.raftWeightGrams) * costPerGram;
     
     // Apply material multiplier Y
     modelCost *= Y;
@@ -1328,19 +1300,17 @@ export class PricingService {
         perUnit: formatUsd(perUnitUsd),
         discount: discountPct > 0 ? `-${discountPct}% (${formatUsd(discountAmountUsd)})` : 'None',
         printTime: estimation.estimatedPrintTime,
-        weight: isSLA
-          ? `${totalMl.toFixed(2)} mL`
-          : `${estimation.filamentLengthM.toFixed(2)}m`,
+        weight: `${estimation.totalWeightGrams.toFixed(2)} g`,
       },
       botzenVariables: {
         Y,
         M,
-        L: isSLA ? null : Q,
-        V: isSLA ? Q : null,
+        L: null,
+        V: Q,
         W,
         T: estimation.estimatedPrintMinutes / 60,
-        A: isSLA ? null : estimation.filamentLengthM,
-        B: isSLA ? totalMl : null,
+        A: null,
+        B: estimation.totalWeightGrams,
       },
       needsRepair,
       printabilityGrade: geometry.printability.grade,

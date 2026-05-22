@@ -179,8 +179,8 @@ export default function AdminDashboard() {
                     <TableHead>Type</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead title="M: Purchase price of spool/bottle">M — Spool Cost ($)</TableHead>
-                    <TableHead title="L (FDM meters) / V (SLA mL)">L/V — Qty</TableHead>
-                    <TableHead title="M/L or M/V: unit rate">Unit Rate</TableHead>
+                    <TableHead title="Spool/Bottle quantity in grams">Qty (g)</TableHead>
+                    <TableHead title="M/Q: unit rate">Unit Rate</TableHead>
                     <TableHead>Colors</TableHead>
                     <TableHead>Active</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -201,11 +201,11 @@ export default function AdminDashboard() {
                       <TableCell>${Number(mat.spool_cost ?? 0).toFixed(2)}</TableCell>
                       <TableCell>
                         {Number(mat.spool_quantity ?? 0).toFixed(0)}
-                        <span className="text-xs text-muted-foreground ml-1">{mat.type === 'SLA' ? 'mL' : 'm'}</span>
+                        <span className="text-xs text-muted-foreground ml-1">g</span>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {mat.spool_quantity > 0
-                          ? `$${(Number(mat.spool_cost) / Number(mat.spool_quantity)).toFixed(4)}/${mat.type === 'SLA' ? 'mL' : 'm'}`
+                          ? `$${(Number(mat.spool_cost) / Number(mat.spool_quantity)).toFixed(4)}/g`
                           : '—'}
                       </TableCell>
                       <TableCell className="text-xs">{Array.isArray(mat.colors) ? mat.colors.join(', ') : mat.colors}</TableCell>
@@ -361,12 +361,10 @@ export default function AdminDashboard() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="mat-spool-qty">
-                      {currentMaterial.type === 'SLA' ? 'V — Bottle Volume (mL)' : 'L — Spool Length (meters)'}
+                      Q — Material Quantity (grams)
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      {currentMaterial.type === 'SLA'
-                        ? 'Total resin volume in the bottle (e.g. 1000 for 1L)'
-                        : 'Total filament length on the spool (e.g. 335m for 1kg PLA)'}
+                      Total quantity of material in grams (e.g., 1000g for a 1kg spool/bottle)
                     </p>
                     <Input
                       id="mat-spool-qty"
@@ -381,10 +379,9 @@ export default function AdminDashboard() {
                 {/* Live unit rate preview */}
                 {currentMaterial.spool_quantity > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Unit rate (M/{currentMaterial.type === 'SLA' ? 'V' : 'L'}):{' '}
+                    Unit rate (M/Q):{' '}
                     <strong className="text-foreground">
-                      ${(Number(currentMaterial.spool_cost) / Number(currentMaterial.spool_quantity)).toFixed(5)}
-                      /{currentMaterial.type === 'SLA' ? 'mL' : 'm'}
+                      ${(Number(currentMaterial.spool_cost) / Number(currentMaterial.spool_quantity)).toFixed(5)}/g
                     </strong>
                   </p>
                 )}
