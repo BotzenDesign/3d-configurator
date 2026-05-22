@@ -36,8 +36,8 @@ const StatRow = ({
       <Icon size={12} className="sm:w-[13px] sm:h-[13px]" style={{ color }} />
     </div>
     <div className="flex-1 min-w-0">
-      <div className="text-[9px] sm:text-[10px] text-muted-foreground/60 leading-none mb-0.5">{label}</div>
-      <div className="text-[10px] sm:text-xs font-medium text-foreground/90 truncate">{value}</div>
+      <div className="text-[9px] sm:text-[10px] text-muted-foreground leading-none mb-0.5">{label}</div>
+      <div className="text-[10px] sm:text-xs font-semibold text-foreground truncate">{value}</div>
     </div>
   </div>
 );

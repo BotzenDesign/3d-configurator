@@ -5,42 +5,42 @@
 @tailwind utilities;
 @layer base {
   :root {
-    --background: 0 0% 12%;
-    --foreground: 0 0% 95%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
 
-    --card: 0 0% 15%;
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
 
-    --popover: 0 0% 15%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
 
-    --primary: 195 100% 50%;
-    --primary-foreground: 0 0% 5%;
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 20%;
-    --secondary-foreground: 0 0% 90%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
 
-    --muted: 0 0% 18%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 195 100% 50%;
-    --accent-foreground: 0 0% 5%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 25%;
-    --input: 0 0% 25%;
-    --ring: 195 100% 50%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 0%;
 
     --radius: 0.5rem;
 
-    --panel-bg: 0 0% 8%;
-    --viewer-bg: 0 0% 22%;
-    --price-color: 0 0% 100%;
-    --config-label: 195 80% 45%;
-    --config-value: 0 0% 75%;
-    --bed-color: 0 0% 30%;
+    --panel-bg: 0 0% 100%;
+    --viewer-bg: 0 0% 96%;
+    --price-color: 0 0% 0%;
+    --config-label: 0 0% 40%;
+    --config-value: 0 0% 0%;
+    --bed-color: 0 0% 85%;
   }
 }
 

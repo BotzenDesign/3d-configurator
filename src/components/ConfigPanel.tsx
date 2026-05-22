@@ -196,7 +196,7 @@ export default function ConfigPanel({
       <div className="p-5 text-center border-b border-border">
         {quote && !isQuoteLoading ? (
           <>
-            <div className="text-5xl font-black tracking-tight text-white">
+            <div className="text-5xl font-black tracking-tight text-foreground">
               {quote.display.perUnit}
               <span className="text-lg font-normal text-muted-foreground ml-1">/ea</span>
             </div>
@@ -215,7 +215,7 @@ export default function ConfigPanel({
             <span className="text-sm">Calculating…</span>
           </div>
         ) : (
-          <div className="text-4xl font-black text-white/20 h-14 flex items-center justify-center">—</div>
+          <div className="text-4xl font-black text-muted-foreground/20 h-14 flex items-center justify-center">—</div>
         )}
       </div>
 
@@ -230,14 +230,14 @@ export default function ConfigPanel({
       <div className="px-4 space-y-3 flex-1">
 
         {/* Print Type Toggle */}
-        <div className="bg-secondary rounded-lg flex overflow-hidden">
+        <div className="bg-secondary rounded-lg flex p-1">
           {(["FDM", "SLA"] as PrintType[]).map((type) => (
             <button
               key={type}
               onClick={() => handlePrintTypeChange(type)}
-              className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+              className={`flex-1 py-2 text-sm font-semibold transition-all rounded-md ${
                 printType === type
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >

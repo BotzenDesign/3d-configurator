@@ -19,10 +19,10 @@ export default function ModelSelector({ selected, onSelect, onUploadClick }: Mod
         <button
           key={m.id}
           onClick={() => onSelect(m.id)}
-          className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl transition-all shrink-0 ${
+          className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl transition-all shrink-0 border shadow-sm ${
             selected === m.id
-              ? "bg-primary/20 ring-2 ring-primary"
-              : "bg-secondary/80 hover:bg-secondary"
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-card text-foreground border-border hover:border-foreground/30"
           }`}
           title={m.label}
         >
@@ -31,14 +31,14 @@ export default function ModelSelector({ selected, onSelect, onUploadClick }: Mod
       ))}
       <button
         onClick={onUploadClick}
-        className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all shrink-0 ${
+        className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all shrink-0 border shadow-sm ${
           selected === "upload"
-            ? "bg-primary/20 ring-2 ring-primary"
-            : "bg-secondary/80 hover:bg-secondary"
+            ? "bg-primary text-primary-foreground border-primary"
+            : "bg-card text-foreground border-border hover:border-foreground/30"
         }`}
         title="Upload STL"
       >
-        <Upload className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-muted-foreground" />
+        <Upload className={`w-5 h-5 sm:w-[22px] sm:h-[22px] ${selected === "upload" ? "text-primary-foreground" : "text-muted-foreground"}`} />
       </button>
     </div>
   );
