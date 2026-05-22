@@ -17,11 +17,11 @@ export default function App() {
   
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
-      <NavMenu>
-        <a href="/app" rel="home">
+      <NavMenu suppressHydrationWarning={true}>
+        <a href="/app" rel="home" suppressHydrationWarning={true}>
           Dashboard
         </a>
-        <a href="/app/settings">Global Settings</a>
+        <a href="/app/settings" suppressHydrationWarning={true}>Global Settings</a>
       </NavMenu>
       <Outlet />
     </AppProvider>

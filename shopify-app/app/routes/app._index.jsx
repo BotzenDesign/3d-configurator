@@ -69,9 +69,18 @@ export const loader = async ({ request }) => {
 
 // ── Action — handle form submissions ─────────────────────────────────────────
 export const action = async ({ request }) => {
-  await authenticate.admin(request);
+  console.log("--> ACTION STARTED");
+  try {
+    await authenticate.admin(request);
+    console.log("--> AUTHENTICATED");
+  } catch (err) {
+    console.log("--> AUTHENTICATION FAILED/THROWN", err);
+    throw err;
+  }
+  
   const formData = await request.formData();
   const intent = formData.get("intent");
+  console.log("--> INTENT:", intent);
 
   try {
     switch (intent) {
