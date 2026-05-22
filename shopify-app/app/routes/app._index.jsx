@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { json } from "@remix-run/node";
-import { useLoaderData, useSubmit, useNavigation, useActionData } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -25,7 +25,27 @@ import {
 import { PlusIcon, EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 
-// ── Supabase helper (server-side only) ────────────────────────────────────────
+// ── Shared secret (must match api.admin.jsx) ───────────────────────────────────
+const ADMIN_SECRET = "polar3d-admin-secret";
+
+// ── Helper: call the new API route directly (no App Bridge token needed) ───────
+async function adminAPI(intent, data = {}) {
+  const res = await fetch("/api/admin", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-admin-secret": ADMIN_SECRET,
+    },
+    body: JSON.stringify({ intent, ...data }),
+  });
+  const json = await res.json();
+  if (!res.ok || json.error) {
+    throw new Error(json.error || `HTTP ${res.status}`);
+  }
+  return json;
+}
+
+// ── Supabase helper (server-side only, for loader) ─────────────────────────────
 async function supabaseFetch(path, options = {}) {
   const url = `${process.env.SUPABASE_URL}/rest/v1${path}`;
   const res = await fetch(url, {
@@ -46,13 +66,13 @@ async function supabaseFetch(path, options = {}) {
   return res.json();
 }
 
-// ── Loader — read materials + settings from Supabase ─────────────────────────
+// ── Loader — read materials + settings from Supabase ──────────────────────────
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
 
   let materials = [];
   let settings = [];
-  
+
   try {
     const results = await Promise.all([
       supabaseFetch("/materials?order=type.asc,label.asc&select=*"),
@@ -61,104 +81,24 @@ export const loader = async ({ request }) => {
     materials = results[0] ?? [];
     settings = results[1] ?? [];
   } catch (error) {
-    console.error("Supabase load error (Tables missing?):", error.message);
+    console.error("Supabase load error:", error.message);
   }
 
   return json({ materials, settings });
 };
 
-// ── Action — handle form submissions ─────────────────────────────────────────
-export const action = async ({ request }) => {
-  console.log("--> ACTION STARTED");
-  try {
-    await authenticate.admin(request);
-    console.log("--> AUTHENTICATED");
-  } catch (err) {
-    console.log("--> AUTHENTICATION FAILED/THROWN", err);
-    throw err;
-  }
-  
-  const formData = await request.formData();
-  const intent = formData.get("intent");
-  console.log("--> INTENT:", intent);
-
-  try {
-    switch (intent) {
-      case "saveMaterial": {
-        const id = formData.get("id");
-        const isNew = formData.get("isNew") === "true";
-        const colors = formData
-          .get("colors")
-          .split(",")
-          .map((c) => c.trim())
-          .filter(Boolean);
-        const payload = {
-          id,
-          label: formData.get("label"),
-          price_label: formData.get("price_label"),
-          type: formData.get("type"),
-          spool_cost: Number(formData.get("spool_cost")),
-          spool_quantity: Number(formData.get("spool_quantity")),
-          colors,
-          is_active: formData.get("is_active") === "true",
-        };
-
-        if (isNew) {
-          await supabaseFetch("/materials", {
-            method: "POST",
-            body: JSON.stringify(payload),
-          });
-        } else {
-          const { id: _id, ...updatePayload } = payload;
-          await supabaseFetch(`/materials?id=eq.${id}`, {
-            method: "PATCH",
-            body: JSON.stringify(updatePayload),
-          });
-        }
-        return json({ success: true });
-      }
-
-      case "deleteMaterial": {
-        const id = formData.get("id");
-        await supabaseFetch(`/materials?id=eq.${id}`, { method: "DELETE" });
-        return json({ success: true });
-      }
-
-      case "toggleMaterial": {
-        const id = formData.get("id");
-        const current = formData.get("is_active") === "true";
-        await supabaseFetch(`/materials?id=eq.${id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ is_active: !current }),
-        });
-        return json({ success: true });
-      }
-
-      case "saveSetting": {
-        const key = formData.get("key");
-        const value = formData.get("value");
-        await supabaseFetch(`/app_settings?key=eq.${key}`, {
-          method: "PATCH",
-          body: JSON.stringify({ value }),
-        });
-        return json({ success: true });
-      }
-
-      default:
-        return json({ error: "Unknown action" }, { status: 400 });
-    }
-  } catch (err) {
-    return json({ error: err.message }, { status: 500 });
-  }
-};
-
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Component ──────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const { materials, settings } = useLoaderData();
-  const actionData = useActionData();
-  const submit = useSubmit();
-  const navigation = useNavigation();
-  const isLoading = navigation.state !== "idle";
+  const { materials: initialMaterials, settings: initialSettings } = useLoaderData();
+
+  // Local state — keeps in sync without page reload
+  const [materials, setMaterials] = useState(initialMaterials);
+  const [settings, setSettings] = useState(initialSettings);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
+
   // Tabs
   const [selectedTab, setSelectedTab] = useState(0);
 
@@ -170,7 +110,29 @@ export default function AdminDashboard() {
   // Setting inline edit state
   const [editedSettings, setEditedSettings] = useState({});
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // Clear success message after 3s
+  useEffect(() => {
+    if (successMsg) {
+      const t = setTimeout(() => setSuccessMsg(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [successMsg]);
+
+  // ── Refresh data from API ─────────────────────────────────────────────────
+  const refreshData = useCallback(async () => {
+    try {
+      const [matRes, setRes] = await Promise.all([
+        adminAPI("getMaterials"),
+        adminAPI("getSettings"),
+      ]);
+      setMaterials(matRes.data ?? []);
+      setSettings(setRes.data ?? []);
+    } catch (err) {
+      console.error("Refresh error:", err.message);
+    }
+  }, []);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
   const openAddModal = useCallback(() => {
     setCurrentMaterial({
       id: "",
@@ -195,54 +157,83 @@ export default function AdminDashboard() {
     setModalOpen(true);
   }, []);
 
-  const handleSaveMaterial = useCallback(() => {
+  const handleSaveMaterial = useCallback(async () => {
     if (!currentMaterial) return;
-    const fd = new FormData();
-    fd.append("intent", "saveMaterial");
-    Object.entries(currentMaterial).forEach(([k, v]) => {
-      if (k !== "isNew") fd.append(k, String(v));
-    });
-    fd.append("isNew", String(!!currentMaterial.isNew));
-    submit(fd, { method: "post" });
-    setModalOpen(false);
-  }, [currentMaterial, submit]);
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      await adminAPI("saveMaterial", {
+        id: currentMaterial.id,
+        isNew: !!currentMaterial.isNew,
+        label: currentMaterial.label,
+        price_label: currentMaterial.price_label,
+        type: currentMaterial.type,
+        spool_cost: Number(currentMaterial.spool_cost),
+        spool_quantity: Number(currentMaterial.spool_quantity),
+        colors: currentMaterial.colors,
+        is_active: currentMaterial.is_active,
+      });
+      setModalOpen(false);
+      setSuccessMsg("Material saved successfully!");
+      await refreshData();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentMaterial, refreshData]);
 
-  const handleDeleteMaterial = useCallback(
-    (id) => {
-      const fd = new FormData();
-      fd.append("intent", "deleteMaterial");
-      fd.append("id", id);
-      submit(fd, { method: "post" });
+  const handleDeleteMaterial = useCallback(async (id) => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      await adminAPI("deleteMaterial", { id });
       setDeleteConfirmId(null);
-    },
-    [submit]
-  );
+      setSuccessMsg("Material deleted.");
+      await refreshData();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [refreshData]);
 
-  const handleToggleActive = useCallback(
-    (id, isActive) => {
-      const fd = new FormData();
-      fd.append("intent", "toggleMaterial");
-      fd.append("id", id);
-      fd.append("is_active", String(isActive));
-      submit(fd, { method: "post" });
-    },
-    [submit]
-  );
+  const handleToggleActive = useCallback(async (id, isActive) => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      await adminAPI("toggleMaterial", { id, is_active: isActive });
+      setSuccessMsg(`Material ${isActive ? "disabled" : "enabled"}.`);
+      await refreshData();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [refreshData]);
 
-  const handleSaveSetting = useCallback(
-    (key) => {
-      const value = editedSettings[key];
-      if (value === undefined) return;
-      const fd = new FormData();
-      fd.append("intent", "saveSetting");
-      fd.append("key", key);
-      fd.append("value", value);
-      submit(fd, { method: "post" });
-    },
-    [editedSettings, submit]
-  );
+  const handleSaveSetting = useCallback(async (key) => {
+    const value = editedSettings[key];
+    if (value === undefined) return;
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      await adminAPI("saveSetting", { key, value });
+      setSuccessMsg(`Setting "${key}" saved.`);
+      setEditedSettings((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      await refreshData();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [editedSettings, refreshData]);
 
-  // ── Materials table rows ──────────────────────────────────────────────────
+  // ── Materials table rows ────────────────────────────────────────────────────
   const materialRows = materials.map((mat) => {
     const unitRate =
       mat.spool_quantity > 0
@@ -291,7 +282,7 @@ export default function AdminDashboard() {
     ];
   });
 
-  // ── Setting descriptions ─────────────────────────────────────────────────
+  // ── Setting descriptions ─────────────────────────────────────────────────────
   const settingDescriptions = {
     material_multiplier_Y:
       "Y — Material cost multiplier (e.g. 2.0 = 2× the raw material cost). Used in Botzen Formula: Price = (Y×M/Q×B) + W×T",
@@ -324,19 +315,40 @@ export default function AdminDashboard() {
           : undefined
       }
     >
+      {/* ── Status Banners ─────────────────────────────────────────────────── */}
       {isLoading && (
-        <Banner tone="info">
-          <InlineStack gap="200" blockAlign="center">
-            <Spinner size="small" />
-            <Text>Saving changes…</Text>
-          </InlineStack>
-        </Banner>
+        <div style={{ marginBottom: "16px" }}>
+          <Banner tone="info">
+            <InlineStack gap="200" blockAlign="center">
+              <Spinner size="small" />
+              <Text>Saving changes…</Text>
+            </InlineStack>
+          </Banner>
+        </div>
       )}
 
-      {actionData?.error && (
-        <Banner tone="critical" title="An error occurred">
-          <Text>{actionData.error}</Text>
-        </Banner>
+      {errorMsg && (
+        <div style={{ marginBottom: "16px" }}>
+          <Banner
+            tone="critical"
+            title="An error occurred"
+            onDismiss={() => setErrorMsg(null)}
+          >
+            <Text>{errorMsg}</Text>
+          </Banner>
+        </div>
+      )}
+
+      {successMsg && (
+        <div style={{ marginBottom: "16px" }}>
+          <Banner
+            tone="success"
+            title="Success"
+            onDismiss={() => setSuccessMsg(null)}
+          >
+            <Text>{successMsg}</Text>
+          </Banner>
+        </div>
       )}
 
       <Layout>
@@ -356,8 +368,8 @@ export default function AdminDashboard() {
                     Botzen Formula:{" "}
                     <strong>Price = (Y × M/Q × B) + W × T</strong>
                     <br />
-                    M = Spool/Bottle Cost, Q = Material Quantity (g),
-                    B = material consumed (g), Y = material multiplier, W =
+                    M = Spool/Bottle Cost, Q = Material Quantity (g), B =
+                    material consumed (g), Y = material multiplier, W =
                     run-time $/hr, T = print time (hrs)
                   </Text>
                 </Banner>
@@ -411,7 +423,7 @@ export default function AdminDashboard() {
                       <InlineStack gap="200" blockAlign="end">
                         <div style={{ flex: 1 }}>
                           <TextField
-                            label=""
+                            label={setting.key}
                             labelHidden
                             value={
                               editedSettings[setting.key] !== undefined
@@ -432,6 +444,7 @@ export default function AdminDashboard() {
                           variant="primary"
                           onClick={() => handleSaveSetting(setting.key)}
                           disabled={editedSettings[setting.key] === undefined}
+                          loading={isLoading}
                         >
                           Save
                         </Button>
@@ -446,7 +459,7 @@ export default function AdminDashboard() {
         </Layout.Section>
       </Layout>
 
-      {/* ── Add / Edit Material Modal ──────────────────────────────────────── */}
+      {/* ── Add / Edit Material Modal ──────────────────────────────────── */}
       {currentMaterial && (
         <Modal
           open={modalOpen}
@@ -459,6 +472,7 @@ export default function AdminDashboard() {
           primaryAction={{
             content: "Save Material",
             onAction: handleSaveMaterial,
+            loading: isLoading,
           }}
           secondaryActions={[
             { content: "Cancel", onAction: () => setModalOpen(false) },
@@ -470,9 +484,7 @@ export default function AdminDashboard() {
               <Banner tone="info">
                 <Text>
                   Formula:{" "}
-                  <strong>
-                    Y × M/Q × B
-                  </strong>
+                  <strong>Y × M/Q × B</strong>
                   &nbsp;— Set M (cost) and Q (quantity in grams) below.
                 </Text>
               </Banner>
@@ -532,10 +544,7 @@ export default function AdminDashboard() {
                   type="number"
                   value={String(currentMaterial.spool_cost)}
                   onChange={(v) =>
-                    setCurrentMaterial({
-                      ...currentMaterial,
-                      spool_cost: v,
-                    })
+                    setCurrentMaterial({ ...currentMaterial, spool_cost: v })
                   }
                   prefix="$"
                   helpText="Total purchase price of one spool or resin bottle"
@@ -546,10 +555,7 @@ export default function AdminDashboard() {
                   type="number"
                   value={String(currentMaterial.spool_quantity)}
                   onChange={(v) =>
-                    setCurrentMaterial({
-                      ...currentMaterial,
-                      spool_quantity: v,
-                    })
+                    setCurrentMaterial({ ...currentMaterial, spool_quantity: v })
                   }
                   suffix="g"
                   helpText="Total quantity of material in grams (e.g., 1000g for a 1kg package)"
@@ -596,7 +602,7 @@ export default function AdminDashboard() {
         </Modal>
       )}
 
-      {/* ── Delete Confirmation Modal ──────────────────────────────────────── */}
+      {/* ── Delete Confirmation Modal ──────────────────────────────────── */}
       <Modal
         open={!!deleteConfirmId}
         onClose={() => setDeleteConfirmId(null)}
@@ -604,6 +610,7 @@ export default function AdminDashboard() {
         primaryAction={{
           content: "Delete",
           destructive: true,
+          loading: isLoading,
           onAction: () => handleDeleteMaterial(deleteConfirmId),
         }}
         secondaryActions={[
@@ -613,7 +620,7 @@ export default function AdminDashboard() {
         <Modal.Section>
           <Text>
             Are you sure you want to delete this material? This action cannot be
-            undone. Existing quotes using this material will not be affected.
+            undone.
           </Text>
         </Modal.Section>
       </Modal>
