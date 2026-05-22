@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { json } from "@remix-run/node";
-import { useLoaderData, useSubmit, useNavigation } from "@remix-run/react";
+import { useLoaderData, useSubmit, useNavigation, useActionData } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -146,10 +146,10 @@ export const action = async ({ request }) => {
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const { materials, settings } = useLoaderData();
+  const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
   const isLoading = navigation.state !== "idle";
-
   // Tabs
   const [selectedTab, setSelectedTab] = useState(0);
 
@@ -321,6 +321,12 @@ export default function AdminDashboard() {
             <Spinner size="small" />
             <Text>Saving changes…</Text>
           </InlineStack>
+        </Banner>
+      )}
+
+      {actionData?.error && (
+        <Banner tone="critical" title="An error occurred">
+          <Text>{actionData.error}</Text>
         </Banner>
       )}
 
