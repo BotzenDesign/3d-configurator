@@ -28,21 +28,34 @@ import { authenticate } from "../shopify.server";
 // ── Shared secret (must match api.admin.jsx) ───────────────────────────────────
 const ADMIN_SECRET = "polar3d-admin-secret";
 
-// ── Helper: call the new API route directly (no App Bridge token needed) ───────
-async function adminAPI(intent, data = {}) {
-  const res = await fetch("/api/admin", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-admin-secret": ADMIN_SECRET,
-    },
-    body: JSON.stringify({ intent, ...data }),
+// ── Helper: use XHR instead of fetch so App Bridge cannot intercept/hang it ────
+// App Bridge patches window.fetch to inject Shopify session tokens.
+// When the postMessage tunnel breaks, patched fetch hangs forever.
+// XMLHttpRequest is never patched by App Bridge.
+function adminAPI(intent, data = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/admin", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("x-admin-secret", ADMIN_SECRET);
+    xhr.timeout = 20000; // 20-second hard timeout
+
+    xhr.onload = () => {
+      try {
+        const body = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && !body.error) {
+          resolve(body);
+        } else {
+          reject(new Error(body.error || `Server error ${xhr.status}`));
+        }
+      } catch {
+        reject(new Error(`Non-JSON response (${xhr.status}): ${xhr.responseText.slice(0, 200)}`));
+      }
+    };
+    xhr.onerror   = () => reject(new Error("Network error — check Railway is running"));
+    xhr.ontimeout = () => reject(new Error("Request timed out after 20s"));
+    xhr.send(JSON.stringify({ intent, ...data }));
   });
-  const json = await res.json();
-  if (!res.ok || json.error) {
-    throw new Error(json.error || `HTTP ${res.status}`);
-  }
-  return json;
 }
 
 // ── Supabase helper (server-side only, for loader) ─────────────────────────────
