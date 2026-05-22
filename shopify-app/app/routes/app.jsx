@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Outlet, useLoaderData, useRouteError } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
@@ -14,15 +15,22 @@ export const loader = async ({ request }) => {
 
 export default function App() {
   const { apiKey } = useLoaderData();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
-      <NavMenu suppressHydrationWarning={true}>
-        <a href="/app" rel="home" suppressHydrationWarning={true}>
-          Dashboard
-        </a>
-        <a href="/app/settings" suppressHydrationWarning={true}>Global Settings</a>
-      </NavMenu>
+      {mounted && (
+        <NavMenu>
+          <a href="/app" rel="home">
+            Dashboard
+          </a>
+          <a href="/app/settings">Global Settings</a>
+        </NavMenu>
+      )}
       <Outlet />
     </AppProvider>
   );
