@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Minus, Plus, Loader2, AlertCircle, ShoppingCart } from "lucide-react";
 import { createCheckout } from "@/lib/shopifyClient";
 import { useQuote } from "@/hooks/useQuote";
-import PriceBreakdown from "./PriceBreakdown";
 import FileUploadComponent from "./FileUploadComponent";
 import ErrorBoundary from "./ErrorBoundary";
 import { supabase } from "@/integrations/supabase/client";
@@ -345,14 +344,7 @@ export default function ConfigPanel({
         </div>
 
         {/* Summary */}
-        <PriceBreakdown
-          quote={quote}
-          isLoading={isQuoteLoading}
-          error={quoteError}
-          hasFile={!!activeFile}
-          modelStats={modelStats}
-          printType={printType}
-        />
+        {/* PriceBreakdown removed per user request */}
       </div>
 
       {/* ── Cart Error ───────────────────────────────────────────────────────── */}
