@@ -344,15 +344,7 @@ export default function ConfigPanel({
           </div>
         </div>
 
-        {/* Summary */}
-        <PriceBreakdown
-          quote={quote}
-          isLoading={isQuoteLoading}
-          error={quoteError}
-          hasFile={!!activeFile}
-          modelStats={modelStats}
-          printType={printType}
-        />
+
       </div>
 
       {/* ── Cart Error ───────────────────────────────────────────────────────── */}
@@ -380,7 +372,15 @@ export default function ConfigPanel({
           )}
         </button>
       </div>
-
+        {/* Summary */}
+        <PriceBreakdown
+          quote={quote}
+          isLoading={isQuoteLoading}
+          error={quoteError}
+          hasFile={!!activeFile}
+          modelStats={modelStats}
+          printType={printType}
+        />
     </div>
   );
 }
