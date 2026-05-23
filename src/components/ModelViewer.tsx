@@ -295,8 +295,8 @@ function ViewerToolbar({
   const btnClass = (active: boolean) =>
     `${btnSize} rounded-lg flex items-center justify-center transition-all text-xs font-bold select-none touch-manipulation ${
       active
-        ? "bg-primary/20 text-primary ring-1 ring-primary/40"
-        : "bg-secondary/80 text-muted-foreground hover:bg-secondary hover:text-foreground active:scale-95"
+        ? "bg-white/20 text-white ring-1 ring-white/40"
+        : "bg-[hsl(var(--viewer-btn-bg))] text-white/70 hover:bg-[hsl(var(--viewer-btn-hover))] hover:text-white active:scale-95"
     }`;
 
   return (
@@ -383,7 +383,7 @@ export default function ModelViewer({ modelType, color, geometry, printType = "F
           camera={{ position: [120, 80, 120], fov: 50 }}
           gl={{
             antialias: device.gpuTier !== "low",
-            alpha: false,
+            alpha: true,
             powerPreference: device.lowPowerMode ? "low-power" : "high-performance",
             stencil: false,
             depth: true,

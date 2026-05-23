@@ -31,13 +31,13 @@ const StatRow = ({
   <div className="flex items-center gap-1.5 sm:gap-2.5 group">
     <div
       className="w-5 h-5 sm:w-6 sm:h-6 rounded-md flex items-center justify-center transition-colors shrink-0"
-      style={{ background: `${color}15` }}
+      style={{ background: `${color}20` }}
     >
       <Icon size={12} className="sm:w-[13px] sm:h-[13px]" style={{ color }} />
     </div>
     <div className="flex-1 min-w-0">
-      <div className="text-[9px] sm:text-[10px] text-muted-foreground leading-none mb-0.5">{label}</div>
-      <div className="text-[10px] sm:text-xs font-semibold text-foreground truncate">{value}</div>
+      <div className="text-[9px] sm:text-[10px] text-white/40 leading-none mb-0.5">{label}</div>
+      <div className="text-[10px] sm:text-xs font-semibold text-white truncate">{value}</div>
     </div>
   </div>
 );
@@ -45,9 +45,9 @@ const StatRow = ({
 export default function ModelStats({ dimensions, volume, surface, weight, modelName }: ModelStatsProps) {
   return (
     <div className="absolute top-2 left-2 right-2 sm:top-4 sm:right-4 sm:left-auto z-10 sm:min-w-[190px] max-w-full sm:max-w-[240px] pointer-events-none">
-      <div className="bg-background/80 backdrop-blur-xl border border-border/50 rounded-xl p-2 sm:p-3 shadow-lg pointer-events-auto">
+      <div className="bg-[hsl(var(--viewer-card))]/90 backdrop-blur-xl border border-[hsl(var(--viewer-card-border))] rounded-xl p-2 sm:p-3 shadow-lg pointer-events-auto">
         {modelName && (
-          <div className="text-[9px] sm:text-[10px] font-semibold text-primary tracking-wide uppercase truncate pb-1 border-b border-border/30 mb-2 sm:mb-2.5">
+          <div className="text-[9px] sm:text-[10px] font-semibold text-white/60 tracking-wide uppercase truncate pb-1 border-b border-white/10 mb-2 sm:mb-2.5">
             {modelName}
           </div>
         )}

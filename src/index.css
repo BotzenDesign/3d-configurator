@@ -5,42 +5,53 @@
 @tailwind utilities;
 @layer base {
   :root {
+    /* Right config panel — light theme */
     --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
+    --foreground: 220 13% 9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
+    --card-foreground: 220 13% 9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
+    --popover-foreground: 220 13% 9%;
 
-    --primary: 0 0% 0%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 220 13% 9%;
+    --primary-foreground: 0 0% 95%;
 
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 9%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 13% 9%;
 
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 46%;
 
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 9%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 13% 9%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 0%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 220 13% 91%;
 
     --radius: 0.5rem;
 
     --panel-bg: 0 0% 100%;
-    --viewer-bg: 0 0% 96%;
-    --price-color: 0 0% 0%;
-    --config-label: 0 0% 40%;
-    --config-value: 0 0% 0%;
-    --bed-color: 0 0% 85%;
+    
+    /* Viewer area — dark */
+    --viewer-bg: 220 13% 9%;
+    --price-color: 220 13% 9%;
+    --config-label: 220 8% 46%;
+    --config-value: 220 13% 9%;
+    --bed-color: 220 13% 22%;
+
+    /* Viewer-specific dark overrides for overlays */
+    --viewer-card: 220 13% 14%;
+    --viewer-card-border: 220 13% 22%;
+    --viewer-text: 0 0% 95%;
+    --viewer-text-muted: 0 0% 60%;
+    --viewer-btn-bg: 220 13% 18%;
+    --viewer-btn-hover: 220 13% 24%;
   }
 }
 

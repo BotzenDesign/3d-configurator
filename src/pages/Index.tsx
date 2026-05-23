@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import * as THREE from "three";
 import Navbar from "@/components/Navbar";
 import ModelViewer from "@/components/ModelViewer";
@@ -27,8 +27,8 @@ const DEFAULT_STATS = {
 };
 
 export default function Index() {
-  const [modelType, setModelType] = useState("bear");
-  const [modelName, setModelName] = useState("bear.stl");
+  const [modelType, setModelType] = useState("upload");
+  const [modelName, setModelName] = useState("Fluid head mounting block.stl");
   const [color, setColor] = useState("#00bcd4");
   const [printType, setPrintType] = useState<"FDM" | "SLA">("FDM");
   const [uploadedGeometry, setUploadedGeometry] = useState<THREE.BufferGeometry | null>(null);
@@ -49,17 +49,10 @@ export default function Index() {
         if (ext === "obj") {
           const result = parseOBJBuffer(buffer);
           geometry = result.geometry;
-          toast.success(`OBJ loaded: ${result.vertexCount.toLocaleString()} vertices, ${result.faceCount.toLocaleString()} faces`);
         } else if (ext === "3mf") {
           geometry = await parse3MF(buffer);
-          const posAttr = geometry.getAttribute("position");
-          const triCount = posAttr.count / 3;
-          toast.success(`3MF loaded: ${triCount.toLocaleString()} triangles`);
         } else {
           geometry = parseSTL(buffer);
-          const posAttr = geometry.getAttribute("position");
-          const triCount = posAttr.count / 3;
-          toast.success(`STL loaded: ${triCount.toLocaleString()} triangles`);
         }
 
         const fileStats = computeStats(geometry);
@@ -69,7 +62,6 @@ export default function Index() {
         setModelType("upload");
         setModelName(file.name);
 
-        // Switch to viewer tab on mobile after upload
         if (isMobile) setMobileTab("viewer");
       } catch (err) {
         console.error("Failed to parse 3D file:", err);
@@ -79,31 +71,22 @@ export default function Index() {
     reader.readAsArrayBuffer(file);
   }, [isMobile]);
 
-  // When a preset model is selected, fetch it as a File so the quote API fires
-  const handleModelSelect = useCallback(async (id: string) => {
-    if (id === "upload") return;
-    setModelType(id);
-    setModelName(`${id}.stl`);
-    setUploadedGeometry(null);
-    setStats(DEFAULT_STATS);
+  // Load the default model on mount
+  useEffect(() => {
+    fetch('/models/default.stl')
+      .then(res => {
+        if (!res.ok) throw new Error("Default model not found");
+        return res.blob();
+      })
+      .then(blob => {
+        const file = new File([blob], 'Fluid head mounting block.stl', { type: 'application/octet-stream' });
+        handleFileUpload(file);
+      })
+      .catch(err => console.log("No default model loaded:", err));
+  }, [handleFileUpload]);
 
-    // Try to fetch the preset STL and wire it into the quote engine
-    const url = PRESET_MODELS[id];
-    if (url) {
-      try {
-        const res = await fetch(url);
-        if (res.ok) {
-          const blob = await res.blob();
-          const file = new File([blob], `${id}.stl`, { type: 'application/octet-stream' });
-          setUploadedFile(file);
-        }
-      } catch {
-        // Preset file not available — quote panel stays in empty state
-        setUploadedFile(null);
-      }
-    } else {
-      setUploadedFile(null);
-    }
+  const handleModelSelect = useCallback(async (id: string) => {
+    // Only upload is used now
   }, []);
 
   // ── Mobile Layout ──────────────────────────────────────────────────────
