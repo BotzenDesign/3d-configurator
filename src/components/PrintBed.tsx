@@ -34,14 +34,14 @@ export default function PrintBed({ printType = "FDM" }: PrintBedProps) {
         {Array.from({ length: Math.floor(GRID_SIZE_Z / 10) + 1 }).map((_, i) => (
           <mesh key={`h-${i}`} position={[0, 0, (i * 10) - (GRID_SIZE_Z / 2)]}>
             <boxGeometry args={[GRID_SIZE_X, 0.05, 0.1]} />
-            <meshBasicMaterial color="#0b0909ff" transparent opacity={0.15} />
+            <meshBasicMaterial color="#0b0909" transparent opacity={0.15} />
           </mesh>
         ))}
         {/* Vertical lines */}
         {Array.from({ length: Math.floor(GRID_SIZE_X / 10) + 1 }).map((_, i) => (
           <mesh key={`v-${i}`} position={[(i * 10) - (GRID_SIZE_X / 2), 0, 0]}>
             <boxGeometry args={[0.1, 0.05, GRID_SIZE_Z]} />
-            <meshBasicMaterial color="#0b0909ff" transparent opacity={0.15} />
+            <meshBasicMaterial color="#0b0909" transparent opacity={0.15} />
           </mesh>
         ))}
       </group>
