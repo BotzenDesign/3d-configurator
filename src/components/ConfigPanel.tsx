@@ -77,6 +77,9 @@ export default function ConfigPanel({
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
 
+  // Checkout note
+  const [customNote, setCustomNote] = useState("");
+
   // Color index — reset when material changes
   const [colorIdx, setColorIdx] = useState(0);
 
@@ -176,6 +179,7 @@ export default function ConfigPanel({
           "Print Time":  quote?.display.printTime ?? "N/A",
           Volume:        modelStats.volume,
           Printability:  quote ? `${quote.printabilityGrade} (${quote.printabilityScore}/100)` : "N/A",
+          ...(customNote.trim() ? { "Order Note": customNote.trim() } : {}),
           _file_name:    modelName,
         },
       });
@@ -354,6 +358,19 @@ export default function ConfigPanel({
           <p className="text-xs text-destructive leading-snug">{cartError}</p>
         </div>
       )}
+
+      {/* ── Custom Order Note ─────────────────────────────────────────────────── */}
+      <div className="px-4 mt-2">
+        <textarea
+          value={customNote}
+          onChange={(e) => setCustomNote(e.target.value)}
+          placeholder="Special requests or notes..."
+          className="w-full bg-secondary text-foreground text-sm rounded-lg px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary min-h-[60px] resize-none"
+        />
+        <p className="text-[10px] text-muted-foreground leading-tight mt-1.5">
+          <strong>Note:</strong> Have a special request, looking for large volume parts, need a special resin don't offer? leave us a note with your order and we will get back to you shortly.
+        </p>
+      </div>
 
       {/* ── Checkout button ──────────────────────────────────────────────────── */}
       <div className="p-4 pt-3">
