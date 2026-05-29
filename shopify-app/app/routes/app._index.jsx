@@ -257,30 +257,31 @@ export default function AdminDashboard() {
     }
   }, [editedSettings, refreshData]);
 
-  // ── Materials table rows ────────────────────────────────────────────────────
   const materialRows = materials.map((mat) => {
     const unitRate =
       mat.spool_quantity > 0
         ? `$${(Number(mat.spool_cost) / Number(mat.spool_quantity)).toFixed(4)}/g`
         : "—";
     return [
-      <InlineStack gap="100" wrap={false} key="actions-left">
-        <Button
-          variant="plain"
-          icon={EditIcon}
-          onClick={() => openEditModal(mat)}
-          accessibilityLabel={`Edit ${mat.label}`}
-        />
-        <Button
-          variant="plain"
-          icon={DuplicateIcon}
-          onClick={() => openDuplicateModal(mat)}
-          accessibilityLabel={`Duplicate ${mat.label}`}
-        />
+      <InlineStack gap="200" wrap={false} blockAlign="center" key="type-actions">
+        <InlineStack gap="0" wrap={false}>
+          <Button
+            variant="plain"
+            icon={EditIcon}
+            onClick={() => openEditModal(mat)}
+            accessibilityLabel={`Edit ${mat.label}`}
+          />
+          <Button
+            variant="plain"
+            icon={DuplicateIcon}
+            onClick={() => openDuplicateModal(mat)}
+            accessibilityLabel={`Duplicate ${mat.label}`}
+          />
+        </InlineStack>
+        <Badge tone={mat.type === "SLA" ? "attention" : "info"}>
+          {mat.type}
+        </Badge>
       </InlineStack>,
-      <Badge tone={mat.type === "SLA" ? "attention" : "info"} key="type">
-        {mat.type}
-      </Badge>,
       <Text key="label" fontWeight="semibold">
         {mat.label}
         <Text as="span" tone="subdued" variant="bodySm">
@@ -288,9 +289,11 @@ export default function AdminDashboard() {
           ({mat.id})
         </Text>
       </Text>,
-      Array.isArray(mat.colors) ? mat.colors.join(", ") : mat.colors,
+      <div style={{ whiteSpace: "normal", maxWidth: "180px", wordBreak: "break-word" }} key="colors">
+        {Array.isArray(mat.colors) ? mat.colors.join(", ") : mat.colors}
+      </div>,
       `$${Number(mat.spool_cost).toFixed(2)}`,
-      `${Number(mat.spool_quantity).toFixed(0)} g`,
+      `${Number(mat.spool_quantity).toFixed(0)}g`,
       unitRate,
       <Badge key="status" tone={mat.is_active ? "success" : "critical"}>
         {mat.is_active ? "Active" : "Inactive"}
@@ -420,10 +423,10 @@ export default function AdminDashboard() {
                 ) : (
                   <DataTable
                     columnContentTypes={[
-                      "text","text","text","text","numeric","numeric","numeric","text","text",
+                      "text","text","text","numeric","numeric","numeric","text","text",
                     ]}
                     headings={[
-                      "","Type","Name","Colors","M — Spool Cost","Qty (g)","Unit Rate","Status","Actions",
+                      "Type","Name","Colors","Cost","Qty","Rate","Status","Actions",
                     ]}
                     rows={materialRows}
                     hoverable
