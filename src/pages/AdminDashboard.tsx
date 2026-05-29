@@ -197,8 +197,8 @@ export default function AdminDashboard() {
               </Button>
             </div>
             
-            <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
-              <Table className="w-full min-w-[800px]">
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Type</TableHead>

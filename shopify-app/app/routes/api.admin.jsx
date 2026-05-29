@@ -71,7 +71,14 @@ export const action = async ({ request }) => {
           ? rawColors.split(",").map((c) => c.trim()).filter(Boolean)
           : rawColors ?? [];
 
-        const payload = { ...rest, colors };
+        let payload = { ...rest, colors };
+
+        // Calculate cost_per_gram to satisfy database NOT NULL constraint
+        if (payload.spool_cost !== undefined || payload.spool_quantity !== undefined) {
+          const sc = Number(payload.spool_cost) || 0;
+          const sq = Number(payload.spool_quantity) || 1;
+          payload.cost_per_gram = sq > 0 ? sc / sq : 0;
+        }
 
         if (isNew) {
           const result = await supabaseFetch("/materials", {
