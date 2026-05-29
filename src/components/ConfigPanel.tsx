@@ -390,7 +390,7 @@ export default function ConfigPanel({
         </button>
       </div>
         {/* Summary */}
-        <PriceBreakdown
+        <PriceBreakdown 
           quote={quote}
           isLoading={isQuoteLoading}
           error={quoteError}
