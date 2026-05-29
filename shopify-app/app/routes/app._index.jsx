@@ -22,7 +22,7 @@ import {
   EmptyState,
   Tabs,
 } from "@shopify/polaris";
-import { PlusIcon, EditIcon, DeleteIcon } from "@shopify/polaris-icons";
+import { PlusIcon, EditIcon, DeleteIcon, DuplicateIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 
 // ── Shared secret (must match api.admin.jsx) ───────────────────────────────────
@@ -170,6 +170,17 @@ export default function AdminDashboard() {
     setModalOpen(true);
   }, []);
 
+  const openDuplicateModal = useCallback((mat) => {
+    setCurrentMaterial({
+      ...mat,
+      id: mat.id + "_copy",
+      label: mat.label + " (Copy)",
+      colors: Array.isArray(mat.colors) ? mat.colors.join(", ") : mat.colors,
+      isNew: true,
+    });
+    setModalOpen(true);
+  }, []);
+
   const handleSaveMaterial = useCallback(async () => {
     if (!currentMaterial) return;
     setIsLoading(true);
@@ -253,6 +264,20 @@ export default function AdminDashboard() {
         ? `$${(Number(mat.spool_cost) / Number(mat.spool_quantity)).toFixed(4)}/g`
         : "—";
     return [
+      <InlineStack gap="100" wrap={false} key="actions-left">
+        <Button
+          variant="plain"
+          icon={EditIcon}
+          onClick={() => openEditModal(mat)}
+          accessibilityLabel={`Edit ${mat.label}`}
+        />
+        <Button
+          variant="plain"
+          icon={DuplicateIcon}
+          onClick={() => openDuplicateModal(mat)}
+          accessibilityLabel={`Duplicate ${mat.label}`}
+        />
+      </InlineStack>,
       <Badge tone={mat.type === "SLA" ? "attention" : "info"} key="type">
         {mat.type}
       </Badge>,
@@ -263,27 +288,14 @@ export default function AdminDashboard() {
           ({mat.id})
         </Text>
       </Text>,
+      Array.isArray(mat.colors) ? mat.colors.join(", ") : mat.colors,
       `$${Number(mat.spool_cost).toFixed(2)}`,
       `${Number(mat.spool_quantity).toFixed(0)} g`,
       unitRate,
-      Array.isArray(mat.colors) ? mat.colors.join(", ") : mat.colors,
       <Badge key="status" tone={mat.is_active ? "success" : "critical"}>
         {mat.is_active ? "Active" : "Inactive"}
       </Badge>,
-      <InlineStack gap="100" key="actions">
-        <Button
-          variant="plain"
-          icon={EditIcon}
-          onClick={() => openEditModal(mat)}
-          accessibilityLabel={`Edit ${mat.label}`}
-        />
-        <Button
-          variant="plain"
-          tone="critical"
-          icon={DeleteIcon}
-          onClick={() => setDeleteConfirmId(mat.id)}
-          accessibilityLabel={`Delete ${mat.label}`}
-        />
+      <InlineStack gap="100" key="actions-right" blockAlign="center">
         <Button
           variant="plain"
           tone={mat.is_active ? "critical" : "success"}
@@ -291,6 +303,13 @@ export default function AdminDashboard() {
         >
           {mat.is_active ? "Disable" : "Enable"}
         </Button>
+        <Button
+          variant="plain"
+          tone="critical"
+          icon={DeleteIcon}
+          onClick={() => setDeleteConfirmId(mat.id)}
+          accessibilityLabel={`Delete ${mat.label}`}
+        />
       </InlineStack>,
     ];
   });
@@ -401,10 +420,10 @@ export default function AdminDashboard() {
                 ) : (
                   <DataTable
                     columnContentTypes={[
-                      "text","text","numeric","numeric","numeric","text","text","text",
+                      "text","text","text","text","numeric","numeric","numeric","text","text",
                     ]}
                     headings={[
-                      "Type","Name","M — Spool Cost","Qty (g)","Unit Rate","Colors","Status","Actions",
+                      "","Type","Name","Colors","M — Spool Cost","Qty (g)","Unit Rate","Status","Actions",
                     ]}
                     rows={materialRows}
                     hoverable
