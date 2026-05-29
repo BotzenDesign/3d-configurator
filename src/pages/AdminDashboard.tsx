@@ -100,29 +100,54 @@ export default function AdminDashboard() {
   const handleSaveMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const parsedCost = Number(currentMaterial.spool_cost) || 0;
+      const parsedQty = Number(currentMaterial.spool_quantity) || 0;
+      
+      let computedCostPerGram = 0;
+      if (parsedQty > 0) {
+        computedCostPerGram = parsedCost / parsedQty;
+      }
+      
+      // Safety check to ensure it's never NaN or null
+      if (isNaN(computedCostPerGram) || !isFinite(computedCostPerGram)) {
+        computedCostPerGram = 0;
+      }
+
       if (currentMaterial.isNew) {
         const { isNew, ...dataToInsert } = currentMaterial;
-        const { error } = await supabase.from('materials').insert([dataToInsert]);
+        dataToInsert.cost_per_gram = computedCostPerGram;
+        dataToInsert.spool_cost = parsedCost;
+        dataToInsert.spool_quantity = parsedQty;
+        
+        console.log("Inserting material:", dataToInsert);
+        const { data, error } = await supabase.from('materials').insert([dataToInsert]).select();
+        console.log("Insert result:", { data, error });
         if (error) throw error;
         toast.success('Material created');
       } else {
-        const { error } = await supabase
-          .from('materials')
-          .update({
+        const dataToUpdate = {
             label:          currentMaterial.label,
             price_label:    currentMaterial.price_label,
             type:           currentMaterial.type,
-            spool_cost:     currentMaterial.spool_cost,
-            spool_quantity: currentMaterial.spool_quantity,
+            spool_cost:     parsedCost,
+            spool_quantity: parsedQty,
+            cost_per_gram:  computedCostPerGram,
             colors:         currentMaterial.colors,
-          })
-          .eq('id', currentMaterial.id);
+        };
+        console.log("Updating material:", dataToUpdate);
+        const { data, error } = await supabase
+          .from('materials')
+          .update(dataToUpdate)
+          .eq('id', currentMaterial.id)
+          .select();
+        console.log("Update result:", { data, error });
         if (error) throw error;
         toast.success('Material updated');
       }
       setIsEditModalOpen(false);
       fetchData();
     } catch (err: any) {
+      console.error("Save Material Error:", err);
       toast.error('Failed to save material: ' + err.message);
     }
   };
@@ -172,8 +197,8 @@ export default function AdminDashboard() {
               </Button>
             </div>
             
-            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-              <Table>
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+              <Table className="w-full min-w-[800px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Type</TableHead>

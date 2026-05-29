@@ -1102,6 +1102,8 @@ export interface PricingConfig {
   materialMultiplierY: number;
   /** W — Fixed run-time multiplier in $/hour (e.g. 1.25 = $1.25 per print-hour) */
   runTimeMultiplierW: number;
+  /** Base setup fee per order in USD */
+  setupFeeUsd: number;
   /** Quantity discount tiers */
   quantityDiscounts: Array<{ minQty: number; discountPct: number }>;
 }
@@ -1110,6 +1112,7 @@ const DEFAULT_CONFIG: PricingConfig = {
   // Overridden at runtime from app_settings table in Supabase.
   materialMultiplierY: 2.5,   // Y: Increased to 2.5x for better overhead coverage
   runTimeMultiplierW:  5.00,  // W: Increased to $5.00/hr (industry average for FDM/SLA)
+  setupFeeUsd:         15.00, // Default setup fee
   quantityDiscounts: [
     { minQty: 5,  discountPct: 5  },
     { minQty: 10, discountPct: 10 },
@@ -1220,36 +1223,37 @@ export class PricingService {
     const totalWeightGrams = estimation.totalWeightGrams;
     const costPerGram = Q > 0 ? M / Q : mat.costPerGram;
     const materialCost = Y * costPerGram * totalWeightGrams;
-    const materialNote = `Y(${Y}) × $${M}/${Q}g × ${totalWeightGrams.toFixed(2)}g (Total)`;
+    const totalMaterialCost = materialCost * quantity;
+    const materialNote = `Y(${Y}) × $${M}/${Q}g × ${totalWeightGrams.toFixed(2)}g × ${quantity}pcs`;
 
     lineItems.push({
       label: `Material — ${mat.name}`,
-      amountUsd: +materialCost.toFixed(4),
+      amountUsd: +totalMaterialCost.toFixed(4),
       note: materialNote,
     });
 
     // ── 2. Machine Run Time ──────────────────────────────────────────────────
     // W × T  (applies to both FDM and SLA)
     const machineCost = W * T;
+    const totalMachineCost = machineCost * quantity;
     lineItems.push({
       label: 'Machine Run Time',
-      amountUsd: +machineCost.toFixed(4),
-      note: `W(${W}) × ${estimation.estimatedPrintTime} (${T.toFixed(2)}h)`,
+      amountUsd: +totalMachineCost.toFixed(4),
+      note: `W(${W}) × ${estimation.estimatedPrintTime} × ${quantity}pcs (${(T * quantity).toFixed(2)}h total)`,
     });
 
-    // ── 3. Setup & Handling Fee ──────────────────────────────────────────────
-    const setupFeeUsd = 15.00;
+    // ── 3. Setup & Handling Fee (Flat per order) ─────────────────────────────
+    const setupFeeUsd = config.setupFeeUsd;
     lineItems.push({
       label: 'Setup & Processing',
       amountUsd: setupFeeUsd,
-      note: 'Standard machine prep & QA',
+      note: 'Standard machine prep & QA (Per order)',
     });
 
-    // ── 4. Unit Price ────────────────────────────────────────────────────────
-    const rawUnit = materialCost + machineCost + setupFeeUsd;
-    const unitPriceUsd = rawUnit;
+    // ── 4. Unit Price (excluding setup fee) ──────────────────────────────────
+    const unitPriceUsd = materialCost + machineCost;
 
-    // ── 4. Quantity Discount ─────────────────────────────────────────────────
+    // ── 5. Quantity Discount ─────────────────────────────────────────────────
     const safeQty = Math.max(1, Math.floor(quantity));
     const discountTier = [...config.quantityDiscounts]
       .reverse()
@@ -1258,8 +1262,20 @@ export class PricingService {
     const discountPct = discountTier?.discountPct ?? 0;
     const subtotalBeforeDiscount = unitPriceUsd * safeQty;
     const discountAmountUsd = subtotalBeforeDiscount * (discountPct / 100);
-    const totalUsd = subtotalBeforeDiscount - discountAmountUsd;
+    const totalBeforeSetup = subtotalBeforeDiscount - discountAmountUsd;
+    
+    // Setup fee is applied once per order/batch
+    const totalUsd = totalBeforeSetup + setupFeeUsd;
     const perUnitUsd = totalUsd / safeQty;
+
+    // ── 6. Discount Line Item (for breakdown) ────────────────────────────────
+    if (discountPct > 0) {
+      lineItems.push({
+        label: `Bulk Discount (${discountPct}%)`,
+        amountUsd: -discountAmountUsd,
+        note: `Applied to material & machine cost`,
+      });
+    }
 
     // Printability check (geometry quality flag — no charge, just informational)
     const needsRepair = !geometry.quality.isManifold &&
@@ -1494,6 +1510,7 @@ Deno.serve(async (req) => {
     pricingService.setConfig({
       materialMultiplierY: Number(settingsMap.material_multiplier_Y ?? 2.0),
       runTimeMultiplierW:  Number(settingsMap.run_time_multiplier_W ?? 1.25),
+      setupFeeUsd:         Number(settingsMap.base_setup_fee ?? 15.00),
       // Support & raft settings
       raftEnabled:   settingsMap.raft_enabled === false || settingsMap.raft_enabled === "false" ? false : true,
       raftLayers:    Number(settingsMap.raft_layers  ?? 3),
