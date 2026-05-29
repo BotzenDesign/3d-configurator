@@ -178,7 +178,7 @@ export default function ConfigPanel({
           Weight:        quote?.display.weight    ?? modelStats.weight,
           "Print Time":  quote?.display.printTime ?? "N/A",
           Volume:        modelStats.volume,
-          Printability:  quote ? `${quote.printabilityGrade} (${quote.printabilityScore}/100)` : "N/A",
+          Printability:  quote ? `${quote.printabilityGrade}` : "N/A",
           ...(customNote.trim() ? { "Order Note": customNote.trim() } : {}),
           _file_name:    modelName,
         },

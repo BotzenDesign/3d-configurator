@@ -1223,12 +1223,12 @@ export class PricingService {
     const totalWeightGrams = estimation.totalWeightGrams;
     const costPerGram = Q > 0 ? M / Q : mat.costPerGram;
     const materialCost = Y * costPerGram * totalWeightGrams;
-    const totalMaterialCost = materialCost * quantity;
+    const batchMaterialCost = materialCost * quantity;
     const materialNote = `Y(${Y}) × $${M}/${Q}g × ${totalWeightGrams.toFixed(2)}g × ${quantity}pcs`;
 
     lineItems.push({
       label: `Material — ${mat.name}`,
-      amountUsd: +totalMaterialCost.toFixed(4),
+      amountUsd: +batchMaterialCost.toFixed(4),
       note: materialNote,
     });
 
@@ -1318,28 +1318,10 @@ export class PricingService {
         printTime: estimation.estimatedPrintTime,
         weight: `${estimation.totalWeightGrams.toFixed(2)} g`,
       },
-      botzenVariables: {
-        Y,
-        M,
-        L: null,
-        V: Q,
-        W,
-        T: estimation.estimatedPrintMinutes / 60,
-        A: null,
-        B: estimation.totalWeightGrams,
-      },
+
       needsRepair,
       printabilityGrade: geometry.printability.grade,
-      printabilityScore: geometry.printability.score,
       volumeBreakdown: { modelMl, supportsMl, raftMl, totalMl },
-      weightBreakdown: {
-        modelGrams: +estimation.weightGrams.toFixed(2),
-        supportsGrams: +estimation.supportWeightGrams.toFixed(2),
-        raftGrams: +estimation.raftWeightGrams.toFixed(2),
-        totalGrams: +estimation.totalWeightGrams.toFixed(2),
-      },
-      filamentLengthM: +estimation.filamentLengthM.toFixed(2),
-      isSLA,
       costBreakdown: {
         modelCost: +modelCost.toFixed(2),
         supportRaftCost: +supportRaftCost.toFixed(2),
