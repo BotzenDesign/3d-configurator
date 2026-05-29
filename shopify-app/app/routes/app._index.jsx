@@ -548,25 +548,14 @@ export default function AdminDashboard() {
                 />
               </FormLayout.Group>
 
-              <FormLayout.Group>
-                <TextField
-                  label="Display Name"
-                  value={currentMaterial.label}
-                  onChange={(v) =>
-                    setCurrentMaterial({ ...currentMaterial, label: v })
-                  }
-                  autoComplete="off"
-                />
-                <TextField
-                  label="Description / Sub-label"
-                  value={currentMaterial.price_label}
-                  onChange={(v) =>
-                    setCurrentMaterial({ ...currentMaterial, price_label: v })
-                  }
-                  placeholder="e.g. $35/1000g spool"
-                  autoComplete="off"
-                />
-              </FormLayout.Group>
+              <TextField
+                label="Display Name"
+                value={currentMaterial.label}
+                onChange={(v) =>
+                  setCurrentMaterial({ ...currentMaterial, label: v })
+                }
+                autoComplete="off"
+              />
 
               <Divider />
               <Text variant="headingSm" fontWeight="semibold">
