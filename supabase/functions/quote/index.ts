@@ -1427,15 +1427,6 @@ async function parse3MFVertices(buffer: Uint8Array): Promise<Float32Array> {
   return positions.subarray(0, posIdx);
 }
 
-// Initialize Supabase Client
-const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error("CRITICAL: SUPABASE_URL or SUPABASE_ANON_KEY is missing from environment variables.");
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
