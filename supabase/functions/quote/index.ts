@@ -818,14 +818,6 @@ export interface EstimationInput {
   boundingBox: { size: { x: number; y: number; z: number } };
   materialId: MaterialId;
   infill: InfillConfig;
-  /** Whether automatic supports are needed */
-  needsSupport?: boolean;
-  /** Layer height in mm */
-  layerHeightMm?: number;
-  /** Whether raft/base is enabled */
-  raftEnabled?: boolean;
-  /** Number of raft layers */
-  raftLayers?: number;
 }
 
 export interface EstimationResult {
@@ -864,8 +856,6 @@ export class MaterialEstimationEngine {
       boundingBox: { size },
       materialId,
       infill,
-      needsSupport = false,
-      layerHeightMm = 0.2,
     } = input;
 
     const material = MATERIALS[materialId];
@@ -895,8 +885,8 @@ export class MaterialEstimationEngine {
     let finalFilamentLengthM = 0;
 
     if (isSLA) {
-      // SLA: Pure geometric time based on layer count and standard 10s per layer
-      const layerCount = Math.ceil(size.z / layerHeightMm);
+      // SLA: Pure geometric time based on layer count and standard 10s per layer (defaulting to 0.05mm layer height)
+      const layerCount = Math.ceil(size.z / 0.05);
       const totalExposureSeconds = layerCount * 10;
                                   
       printTimeMinutes = Math.max(1, Math.round(totalExposureSeconds / 60));
@@ -1359,10 +1349,6 @@ Deno.serve(async (req) => {
       materialMultiplierY: Number(settingsMap.material_multiplier_Y ?? 2.0),
       runTimeMultiplierW:  Number(settingsMap.run_time_multiplier_W ?? 1.25),
       setupFeeUsd:         Number(settingsMap.base_setup_fee ?? 15.00),
-      // Support & raft settings
-      raftEnabled:   settingsMap.raft_enabled === false || settingsMap.raft_enabled === "false" ? false : true,
-      raftLayers:    Number(settingsMap.raft_layers  ?? 3),
-      layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2),
     } as any);
     
     // Also update FileValidationService dynamic max file size if present
@@ -1412,10 +1398,6 @@ Deno.serve(async (req) => {
         shellCount: 2,
         topBottomLayers: 4,
       },
-      needsSupport: settingsMap.supports_enabled === "false" ? false : true,
-      layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2), 
-      raftEnabled: settingsMap.raft_enabled === false || settingsMap.raft_enabled === "false" ? false : true,
-      raftLayers: Number(settingsMap.raft_layers ?? 3),
     });
 
     // 4. Final Pricing Quote
