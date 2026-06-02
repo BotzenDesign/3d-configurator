@@ -810,43 +810,6 @@ export interface InfillConfig {
   topBottomLayers: number;  // top + bottom solid layers count
 }
 
-// Effective infill material ratio (accounting for shells and top/bottom)
-function effectiveInfillRatio(
-  volumeCm3: number,
-  bbox: { size: { x: number; y: number; z: number } },
-  infill: InfillConfig,
-  layerHeightMm: number = 0.2
-): number {
-  const { percentage, shellCount, topBottomLayers } = infill;
-
-  // Estimate shell volume: perimeter area × shell thickness × layer count
-  const shellThicknessMm = 0.4 * shellCount; // 0.4mm per wall (standard nozzle)
-  const modelHeightMm = bbox.size.z;
-
-  // Perimeter shell: outer surface area × shell thickness
-  // Approximated as fraction of total volume
-  const surfaceShellFraction = Math.min(
-    0.9,
-    (shellThicknessMm * 2 * (bbox.size.x + bbox.size.y) * modelHeightMm) /
-    Math.max(1, volumeCm3 * 1000)
-  );
-
-  // Top/bottom shell fraction
-  const topBottomThicknessMm = topBottomLayers * layerHeightMm;
-  const topBottomFraction = Math.min(
-    0.9,
-    (topBottomThicknessMm * 2 * bbox.size.x * bbox.size.y) /
-    Math.max(1, volumeCm3 * 1000)
-  );
-
-  // Shell regions are always solid
-  const shellSolidFraction = Math.min(1, surfaceShellFraction + topBottomFraction);
-  const infillRegionFraction = Math.max(0, 1 - shellSolidFraction);
-
-  // Total effective fill ratio
-  return shellSolidFraction + infillRegionFraction * (percentage / 100);
-}
-
 // ── Weight & Cost Calculation ────────────────────────────────────────────────
 
 export interface EstimationInput {
@@ -889,7 +852,6 @@ export interface EstimationResult {
 }
 
 const FILAMENT_DIAMETER_MM = 1.75;
-const WASTE_FACTOR = 1.05; // 5% waste (purge lines, skirt)
 
 export class MaterialEstimationEngine {
   /**
@@ -915,19 +877,15 @@ export class MaterialEstimationEngine {
     // ── FDM uses WEIGHT for cost. SLA uses VOLUME for cost (per PDF spec). ──
     const isSLA = material.isResin;
 
-    // 1. Effective fill ratio (FDM only; SLA cures the full cross-section)
-    const fillRatio = isSLA ? 1.0 : effectiveInfillRatio(volumeCm3, { size }, infill, layerHeightMm);
+    // 1. Effective fill ratio (Strict math)
+    const fillRatio = isSLA ? 1.0 : (infill.percentage / 100);
     const effectiveVolumeCm3 = volumeCm3 * fillRatio;
 
     // 3. Support material (Removed per client request)
     const supportVolumeCm3 = 0;
 
-    // 4. Raft material
-    let raftVolumeCm3 = 0;
-    if (input.raftEnabled) {
-      // area (mm2) * height (mm) / 1000 = cm3
-      raftVolumeCm3 = (size.x * size.y * ((input.raftLayers || 3) * layerHeightMm)) / 1000;
-    }
+    // 4. Raft material (Removed per client request)
+    const raftVolumeCm3 = 0;
 
     // 5. Total volume
     const totalVolumeCm3 = effectiveVolumeCm3 + supportVolumeCm3 + raftVolumeCm3;
@@ -937,54 +895,24 @@ export class MaterialEstimationEngine {
     let finalFilamentLengthM = filamentLengthM;
 
     if (isSLA) {
-      // SLA: Exposure-based timing (Jacob's Equation from formula.md)
-      const layerHeight = layerHeightMm; // Cd in formula
-      const normalExposure = 2.5; // Average t for standard resin at 0.05mm
-      const bottomExposureMultiplier = 5; // 3-8x multiplier from formula.md
-      const bottomLayers = 5;
-      const liftRetractTime = 8; // Mechanical overhead per layer (lift + retract)
-      
-      const layerCount = Math.ceil(size.z / layerHeight);
-      
-      // Time = (Normal Layers * (t + lift)) + (Bottom Layers * (t*multiplier + lift))
-      const totalExposureSeconds = (layerCount - bottomLayers) * (normalExposure + liftRetractTime) + 
-                                  (bottomLayers * (normalExposure * bottomExposureMultiplier + liftRetractTime));
+      // SLA: Pure geometric time based on layer count and standard 10s per layer
+      const layerCount = Math.ceil(size.z / layerHeightMm);
+      const totalExposureSeconds = layerCount * 10;
                                   
-      printTimeMinutes = Math.max(5, Math.round(totalExposureSeconds / 60));
+      printTimeMinutes = Math.max(1, Math.round(totalExposureSeconds / 60));
     } else {
-      // FDM: Volumetric estimation based on formula.md (Cura Logic)
-      const nozzleDiameterMm = 0.4;
-      const lineWidth = nozzleDiameterMm * 1.05; // Standard Cura default
+      // FDM: Pure geometric length
       const filamentArea = Math.PI * Math.pow(FILAMENT_DIAMETER_MM / 2, 2);
       
-      // Calculate travel distance (L_travel) for ALL components
-      // 1. Model Shells: surface area * shellCount
-      const shellPathMm = (surfaceAreaCm2 * 100) * (input.infill.shellCount || 2);
-      
-      // 2. Model Infill: (Volume - ShellVolume) / (Area of extrusion)
-      // Note: We subtract shell volume to avoid double-counting
-      const shellVolumeMm3 = (surfaceAreaCm2 * 100) * (lineWidth * (input.infill.shellCount || 2));
-      const modelInfillVolumeMm3 = Math.max(0, (volumeCm3 * 1000) - shellVolumeMm3) * (input.infill.percentage / 100);
-      const modelInfillPathMm = modelInfillVolumeMm3 / (lineWidth * layerHeightMm);
-
-      // 3. Support & Raft Path
-      const supportPathMm = (supportVolumeCm3 * 1000) / (lineWidth * layerHeightMm);
-      const raftPathMm = (raftVolumeCm3 * 1000) / (lineWidth * layerHeightMm);
-
-      const totalTravelMm = (shellPathMm + modelInfillPathMm + supportPathMm + raftPathMm) * WASTE_FACTOR;
-      
-      // E = (line_width * layer_height * travel_distance) / filament_area
-      // This is the "A" variable in the Botzen formula (converted to meters)
-      const extrusionVolumeMm3 = (lineWidth * layerHeightMm * totalTravelMm);
+      const extrusionVolumeMm3 = totalVolumeCm3 * 1000;
       finalFilamentLengthM = (extrusionVolumeMm3 / filamentArea) / 1000;
       
-      // Update print time using travel speed
+      // Update print time using pure travel speed
       const printSpeedMms = Math.max(1, Math.min(material.maxSpeedMms, 60));
+      const totalTravelMm = finalFilamentLengthM * 1000;
       const extrusionTimeSeconds = totalTravelMm / printSpeedMms;
       
-      // Add mechanical overhead (retractions, layer changes, travel moves)
-      const setupOverheadMinutes = 10;
-      printTimeMinutes = Math.round(extrusionTimeSeconds / 60) + setupOverheadMinutes;
+      printTimeMinutes = Math.round(extrusionTimeSeconds / 60);
     }
 
     const estimatedPrintTime = formatPrintTime(printTimeMinutes);
@@ -1059,8 +987,6 @@ export interface PricingConfig {
   runTimeMultiplierW: number;
   /** Base setup fee per order in USD */
   setupFeeUsd: number;
-  /** Quantity discount tiers */
-  quantityDiscounts: Array<{ minQty: number; discountPct: number }>;
 }
 
 const DEFAULT_CONFIG: PricingConfig = {
@@ -1068,12 +994,6 @@ const DEFAULT_CONFIG: PricingConfig = {
   materialMultiplierY: 2.5,   // Y: Increased to 2.5x for better overhead coverage
   runTimeMultiplierW:  5.00,  // W: Increased to $5.00/hr (industry average for FDM/SLA)
   setupFeeUsd:         15.00, // Default setup fee
-  quantityDiscounts: [
-    { minQty: 5,  discountPct: 5  },
-    { minQty: 10, discountPct: 10 },
-    { minQty: 25, discountPct: 15 },
-    { minQty: 50, discountPct: 20 },
-  ],
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -1220,29 +1140,17 @@ export class PricingService {
     // ── 4. Unit Price (excluding setup fee) ──────────────────────────────────
     const unitPriceUsd = materialCost + machineCost;
 
-    // ── 5. Quantity Discount ─────────────────────────────────────────────────
+    // ── 5. Total Price ───────────────────────────────────────────────────────
     const safeQty = Math.max(1, Math.floor(quantity));
-    const discountTier = [...config.quantityDiscounts]
-      .reverse()
-      .find(d => safeQty >= d.minQty);
-
-    const discountPct = discountTier?.discountPct ?? 0;
-    const subtotalBeforeDiscount = unitPriceUsd * safeQty;
-    const discountAmountUsd = subtotalBeforeDiscount * (discountPct / 100);
-    const totalBeforeSetup = subtotalBeforeDiscount - discountAmountUsd;
+    const subtotal = unitPriceUsd * safeQty;
     
     // Setup fee is applied once per order/batch
-    const totalUsd = totalBeforeSetup + setupFeeUsd;
+    const totalUsd = subtotal + setupFeeUsd;
     const perUnitUsd = totalUsd / safeQty;
 
-    // ── 6. Discount Line Item (for breakdown) ────────────────────────────────
-    if (discountPct > 0) {
-      lineItems.push({
-        label: `Bulk Discount (${discountPct}%)`,
-        amountUsd: -discountAmountUsd,
-        note: `Applied to material & machine cost`,
-      });
-    }
+    // No bulk discount applied
+    const discountPct = 0;
+    const discountAmountUsd = 0;
 
     // Printability check (geometry quality flag — no charge, just informational)
     const needsRepair = !geometry.quality.isManifold &&
