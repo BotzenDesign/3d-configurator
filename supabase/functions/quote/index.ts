@@ -892,7 +892,7 @@ export class MaterialEstimationEngine {
 
     // 6. Print time estimate
     let printTimeMinutes = 0;
-    let finalFilamentLengthM = filamentLengthM;
+    let finalFilamentLengthM = 0;
 
     if (isSLA) {
       // SLA: Pure geometric time based on layer count and standard 10s per layer
