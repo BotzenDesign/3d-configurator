@@ -280,6 +280,7 @@ export default function AdminDashboard() {
                     material_multiplier_Y: 'Y — Material multiplier. Applied to raw material cost (e.g. 2.0 = 2× the material cost).',
                     run_time_multiplier_W: 'W — Run time multiplier in $/hour. Charged per hour of machine print time (e.g. 1.25 = $1.25/hr).',
                     max_file_size_mb: 'Maximum upload file size in megabytes.',
+                    custom_order_note_description: 'Description shown below the custom order note field in the configurator.',
                   };
                   return (
                     <div key={setting.key} className="space-y-2">

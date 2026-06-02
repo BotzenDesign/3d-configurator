@@ -79,6 +79,7 @@ export default function ConfigPanel({
 
   // Checkout note
   const [customNote, setCustomNote] = useState("");
+  const [noteDescription, setNoteDescription] = useState("Have a special request, looking for large volume parts, need a special resin don't offer? leave us a note with your order and we will get back to you shortly.");
 
   // Color index — reset when material changes
   const [colorIdx, setColorIdx] = useState(0);
@@ -94,7 +95,16 @@ export default function ConfigPanel({
       }
       setLoadingMaterials(false);
     }
+
+    async function loadSettings() {
+      const { data, error } = await supabase.from("app_settings").select("value").eq("key", "custom_order_note_description").single();
+      if (data && data.value) {
+        setNoteDescription(String(data.value).replace(/^"|"$/g, ''));
+      }
+    }
+
     loadMats();
+    loadSettings();
   }, []);
 
   const materials = dbMaterials.filter(m => m.type === printType).map(m => ({
@@ -368,7 +378,7 @@ export default function ConfigPanel({
           className="w-full bg-secondary text-foreground text-sm rounded-lg px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary min-h-[60px] resize-none"
         />
         <p className="text-[10px] text-muted-foreground leading-tight mt-1.5">
-          <strong>Note:</strong> Have a special request, looking for large volume parts, need a special resin don't offer? leave us a note with your order and we will get back to you shortly.
+          <strong>Note:</strong> {noteDescription}
         </p>
       </div>
 

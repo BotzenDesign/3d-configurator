@@ -781,8 +781,6 @@ export type MaterialId = string;
 export interface Material {
   id: MaterialId;
   name: string;
-  /** Density in g/cm³ */
-  densityGcm3: number;
   /** @deprecated Use spoolCost/spoolQuantity instead. Kept for fallback only. */
   costPerGram: number;
   /** M — Total purchase price of the spool or resin bottle in USD */
@@ -874,29 +872,20 @@ export interface EstimationResult {
   infill: InfillConfig;
   /** Effective material volume used (cm³) */
   effectiveVolumeCm3: number;
-  /** Model weight in grams */
-  weightGrams: number;
-  /** Support material weight (if any) in grams */
-  supportWeightGrams: number;
-  /** Raft material weight in grams */
-  raftWeightGrams: number;
-  /** Raft material volume in cm3 (mL) */
+  /** Support material volume in cm³ (mL) */
+  supportVolumeCm3: number;
+  /** Raft material volume in cm³ (mL) */
   raftVolumeCm3: number;
-  /** Total weight including support, raft, and waste */
-  totalWeightGrams: number;
-  /** Total filament length in meters */
+  /** Total volume including support and raft */
+  totalVolumeCm3: number;
+  /** Total filament length in meters (A in formula) */
   filamentLengthM: number;
-  /** Material cost in USD */
-  materialCostUsd: number;
   /** Print time estimate in minutes */
   estimatedPrintMinutes: number;
   /** Print time formatted */
   estimatedPrintTime: string;
   /** Per-unit breakdown */
   breakdown: {
-    modelMaterialGrams: number;
-    supportMaterialGrams: number;
-    wasteMaterialGrams: number;
     infillEffectivePercent: number;
   };
 }
@@ -934,44 +923,23 @@ export class MaterialEstimationEngine {
     const fillRatio = isSLA ? 1.0 : effectiveInfillRatio(volumeCm3, { size }, infill, layerHeightMm);
     const effectiveVolumeCm3 = volumeCm3 * fillRatio;
 
-    // 2. Model weight (used for FDM cost & display; SLA also tracks it for reference)
-    const modelWeightGrams = effectiveVolumeCm3 * material.densityGcm3;
-
     // 3. Support material
-    let supportWeightGrams = 0;
     let supportVolumeCm3 = 0;
     if (needsSupport || material.isResin) {
       supportVolumeCm3 = volumeCm3 * supportFraction * SUPPORT_DENSITY;
-      supportWeightGrams = supportVolumeCm3 * material.densityGcm3;
     }
 
     // 4. Raft material
     let raftVolumeCm3 = 0;
-    let raftWeightGrams = 0;
     if (input.raftEnabled) {
       // area (mm2) * height (mm) / 1000 = cm3
       raftVolumeCm3 = (size.x * size.y * ((input.raftLayers || 3) * layerHeightMm)) / 1000;
-      raftWeightGrams = raftVolumeCm3 * material.densityGcm3;
     }
 
-    // 5. Waste factor (FDM only — purge lines, skirt; SLA resin waste is negligible)
-    const safetyFactor = 1.15; // 15% safety buffer for real-world material overhead
-    const wasteMaterialGrams = isSLA ? 0 : (modelWeightGrams + supportWeightGrams + raftWeightGrams) * (WASTE_FACTOR * safetyFactor - 1);
-    const totalWeightGrams = modelWeightGrams + supportWeightGrams + raftWeightGrams + wasteMaterialGrams;
+    // 5. Total volume
+    const totalVolumeCm3 = effectiveVolumeCm3 + supportVolumeCm3 + raftVolumeCm3;
 
-    // 6. Filament length (FDM only)
-    const filamentRadiusCm = (FILAMENT_DIAMETER_MM / 2) / 10;
-    const filamentLengthCm = isSLA ? 0 : (totalWeightGrams / material.densityGcm3) /
-      (Math.PI * filamentRadiusCm * filamentRadiusCm);
-    const filamentLengthM = filamentLengthCm / 100;
-
-    // 7. Material cost
-    // Strictly weight-based in grams for both (volume only in grams)
-    const costPerGram = material.spoolQuantity > 0 ? (material.spoolCost / material.spoolQuantity) : material.costPerGram;
-    const materialCostUsd = totalWeightGrams * costPerGram;
-
-
-    // 7. Print time estimate
+    // 6. Print time estimate
     let printTimeMinutes = 0;
     let finalFilamentLengthM = filamentLengthM;
 
@@ -1032,19 +1000,13 @@ export class MaterialEstimationEngine {
       material,
       infill,
       effectiveVolumeCm3: +effectiveVolumeCm3.toFixed(3),
-      weightGrams: +modelWeightGrams.toFixed(2),
-      supportWeightGrams: +supportWeightGrams.toFixed(2),
-      raftWeightGrams: +raftWeightGrams.toFixed(2),
+      supportVolumeCm3: +supportVolumeCm3.toFixed(3),
       raftVolumeCm3: +raftVolumeCm3.toFixed(3),
-      totalWeightGrams: +totalWeightGrams.toFixed(2),
-      filamentLengthM: +finalFilamentLengthM.toFixed(2),
-      materialCostUsd: +materialCostUsd.toFixed(4),
+      totalVolumeCm3: +totalVolumeCm3.toFixed(3),
+      filamentLengthM: +(isSLA ? 0 : finalFilamentLengthM).toFixed(2),
       estimatedPrintMinutes: printTimeMinutes,
       estimatedPrintTime,
       breakdown: {
-        modelMaterialGrams: +modelWeightGrams.toFixed(2),
-        supportMaterialGrams: +supportWeightGrams.toFixed(2),
-        wasteMaterialGrams: +wasteMaterialGrams.toFixed(2),
         infillEffectivePercent: +(fillRatio * 100).toFixed(1),
       },
     };
@@ -1215,16 +1177,28 @@ export class PricingService {
     const Y = config.materialMultiplierY;  // material multiplier
     const W = config.runTimeMultiplierW;   // run-time multiplier ($/hr)
     const M = mat.spoolCost;               // purchase price of spool/bottle
-    const Q = mat.spoolQuantity;           // spool/bottle weight in grams
+    const Q = mat.spoolQuantity;           // spool/bottle quantity (L or V)
     const T = estimation.estimatedPrintMinutes / 60; // print time in hours
 
     // ── 1. Material Cost ─────────────────────────────────────────────────────
-    // For both FDM and SLA: Y × (M/Q) × totalWeightGrams  where totalWeightGrams = printed weight in grams
-    const totalWeightGrams = estimation.totalWeightGrams;
-    const costPerGram = Q > 0 ? M / Q : mat.costPerGram;
-    const materialCost = Y * costPerGram * totalWeightGrams;
+    let materialCost = 0;
+    let materialNote = '';
+
+    if (isSLA) {
+      // SLA Jobs = (Y * M / V * B) + W * T
+      // B = total volume in mL (effective + support + raft)
+      const B = estimation.totalVolumeCm3;
+      materialCost = Y * (M / Q) * B;
+      materialNote = `Y(${Y}) × $${M}/${Q}mL × ${B.toFixed(2)}mL × ${quantity}pcs`;
+    } else {
+      // FDM Jobs = (Y * M / L * A) + W * T
+      // A = filament length in meters
+      const A = estimation.filamentLengthM;
+      materialCost = Y * (M / Q) * A;
+      materialNote = `Y(${Y}) × $${M}/${Q}m × ${A.toFixed(2)}m × ${quantity}pcs`;
+    }
+
     const batchMaterialCost = materialCost * quantity;
-    const materialNote = `Y(${Y}) × $${M}/${Q}g × ${totalWeightGrams.toFixed(2)}g × ${quantity}pcs`;
 
     lineItems.push({
       label: `Material — ${mat.name}`,
@@ -1282,25 +1256,26 @@ export class PricingService {
       (geometry.quality.nonManifoldEdges > 0 || geometry.quality.boundaryEdges > 5);
 
     const modelMl    = +estimation.effectiveVolumeCm3.toFixed(2);
-    const supportsMl = +estimation.supportWeightGrams > 0
-      ? +(estimation.supportWeightGrams / estimation.material.densityGcm3).toFixed(2)
-      : 0;
-    
-    const raftMl = +(estimation.raftVolumeCm3).toFixed(2);
-    const totalMl = +(modelMl + supportsMl + raftMl).toFixed(2);
+    const supportsMl = +estimation.supportVolumeCm3.toFixed(2);
+    const raftMl     = +estimation.raftVolumeCm3.toFixed(2);
+    const totalMl    = +estimation.totalVolumeCm3.toFixed(2);
 
     // ── Cost breakdown (Pure Material) ───────────────────────────────────────
     let modelCost = 0;
     let supportRaftCost = 0;
-    let totalMaterialCost = 0;
+    let totalMaterialCost = materialCost; // already calculated per unit
 
-    modelCost = estimation.weightGrams * costPerGram;
-    supportRaftCost = (estimation.supportWeightGrams + estimation.raftWeightGrams) * costPerGram;
-    
-    // Apply material multiplier Y
-    modelCost *= Y;
-    supportRaftCost *= Y;
-    totalMaterialCost = modelCost + supportRaftCost;
+    if (isSLA) {
+      const costPerVolume = (M / Q);
+      modelCost = estimation.effectiveVolumeCm3 * costPerVolume * Y;
+      supportRaftCost = (estimation.supportVolumeCm3 + estimation.raftVolumeCm3) * costPerVolume * Y;
+    } else {
+      // For FDM, we don't have separate length breakdown for support/raft vs model,
+      // so we approximate it via volume ratio
+      const ratio = totalMl > 0 ? modelMl / totalMl : 1;
+      modelCost = materialCost * ratio;
+      supportRaftCost = materialCost * (1 - ratio);
+    }
 
     return {
       lineItems,
@@ -1316,7 +1291,7 @@ export class PricingService {
         perUnit: formatUsd(perUnitUsd),
         discount: discountPct > 0 ? `-${discountPct}% (${formatUsd(discountAmountUsd)})` : 'None',
         printTime: estimation.estimatedPrintTime,
-        weight: `${estimation.totalWeightGrams.toFixed(2)} g`,
+        weight: isSLA ? `${estimation.totalVolumeCm3.toFixed(2)} mL` : `${estimation.filamentLengthM.toFixed(2)} m`,
       },
 
       needsRepair,
@@ -1460,7 +1435,6 @@ Deno.serve(async (req) => {
       acc[mat.id] = {
         id:              mat.id,
         name:            mat.label,
-        densityGcm3:     Number(mat.density_gcm3 || (isSLA ? 1.1 : 1.24)),
         costPerGram:     Number(mat.cost_per_gram),
         spoolCost:       Number(mat.spool_cost ?? mat.cost_per_gram * (isSLA ? 1000 : 335)),
         spoolQuantity:   Number(mat.spool_quantity ?? (isSLA ? 1000 : 335)),
