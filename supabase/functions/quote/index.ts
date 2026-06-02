@@ -857,8 +857,6 @@ export interface EstimationInput {
   infill: InfillConfig;
   /** Whether automatic supports are needed */
   needsSupport?: boolean;
-  /** Support contact area fraction (0–1, estimated from overhang analysis) */
-  supportFraction?: number;
   /** Layer height in mm */
   layerHeightMm?: number;
   /** Whether raft/base is enabled */
@@ -892,7 +890,6 @@ export interface EstimationResult {
 
 const FILAMENT_DIAMETER_MM = 1.75;
 const WASTE_FACTOR = 1.05; // 5% waste (purge lines, skirt)
-const SUPPORT_DENSITY = 0.15; // 15% infill for supports
 
 export class MaterialEstimationEngine {
   /**
@@ -906,7 +903,6 @@ export class MaterialEstimationEngine {
       materialId,
       infill,
       needsSupport = false,
-      supportFraction = 0.15,
       layerHeightMm = 0.2,
     } = input;
 
@@ -923,11 +919,8 @@ export class MaterialEstimationEngine {
     const fillRatio = isSLA ? 1.0 : effectiveInfillRatio(volumeCm3, { size }, infill, layerHeightMm);
     const effectiveVolumeCm3 = volumeCm3 * fillRatio;
 
-    // 3. Support material
-    let supportVolumeCm3 = 0;
-    if (needsSupport || material.isResin) {
-      supportVolumeCm3 = volumeCm3 * supportFraction * SUPPORT_DENSITY;
-    }
+    // 3. Support material (Removed per client request)
+    const supportVolumeCm3 = 0;
 
     // 4. Raft material
     let raftVolumeCm3 = 0;
@@ -1512,7 +1505,6 @@ Deno.serve(async (req) => {
         topBottomLayers: 4,
       },
       needsSupport: settingsMap.supports_enabled === "false" ? false : true,
-      supportFraction: Number(settingsMap.support_density ?? 0.15),
       layerHeightMm: Number(settingsMap.layer_height_fdm ?? 0.2), 
       raftEnabled: settingsMap.raft_enabled === false || settingsMap.raft_enabled === "false" ? false : true,
       raftLayers: Number(settingsMap.raft_layers ?? 3),
