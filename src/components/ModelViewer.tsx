@@ -208,17 +208,14 @@ function UploadedModel({
       g = simplifyGeometry(g, { targetTriangles: maxPolygons });
     }
 
-    // Center and scale
+    // Center
     g.computeBoundingBox();
     const box = g.boundingBox!;
     const center = new THREE.Vector3();
     box.getCenter(center);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = 60 / maxDim;
     g.translate(-center.x, -center.y + size.y / 2, -center.z);
-    g.scale(scale, scale, scale);
 
     // Orientation: landscape = rotate 90° around Y axis
     if (orientation === "landscape") {

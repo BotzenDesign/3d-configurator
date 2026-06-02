@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Minus, Plus, Loader2, AlertCircle, ShoppingCart } from "lucide-react";
 import { createCheckout } from "@/lib/shopifyClient";
 import { useQuote } from "@/hooks/useQuote";
@@ -9,6 +9,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 // ── Print Type ────────────────────────────────────────────────────────────────
 type PrintType = "FDM" | "SLA";
+
+// ── Build Volume Constants ───────────────────────────────────────────────
+const BUILD_VOLUME = {
+  FDM: { l: 330, w: 240, h: 300 },
+  SLA: { l: 200, w: 125, h: 210 },
+} as const;
 
 // ── Color hex map ─────────────────────────────────────────────────────────────
 const COLOR_HEX: Record<string, string> = {
@@ -129,6 +135,19 @@ export default function ConfigPanel({
   // Infill value — SLA is always 100%
   const effectiveInfill = printType === "SLA" ? 100 : INFILL_OPTIONS[infillIdx].value;
 
+  // Check if model exceeds max build volume
+  const isOversized = useMemo(() => {
+    if (!modelStats.dimensions || modelStats.dimensions === "0mm x 0mm x 0mm") return false;
+    const dims = modelStats.dimensions.split('x').map(s => parseFloat(s)).filter(n => !isNaN(n));
+    if (dims.length !== 3) return false;
+    
+    const bv = BUILD_VOLUME[printType];
+    const bedDims = [bv.l, bv.w, bv.h].sort((a,b) => b-a);
+    const partDims = dims.sort((a,b) => b-a);
+    
+    return partDims[0] > bedDims[0] || partDims[1] > bedDims[1] || partDims[2] > bedDims[2];
+  }, [modelStats.dimensions, printType]);
+
   // ── Real-time quote ─────────────────────────────────────────────────────────
   const { quote, isLoading: isQuoteLoading, error: quoteError } = useQuote({
     file: activeFile,
@@ -190,6 +209,7 @@ export default function ConfigPanel({
           Volume:        modelStats.volume,
           Printability:  quote ? `${quote.printabilityGrade}` : "N/A",
           ...(customNote.trim() ? { "Order Note": customNote.trim() } : {}),
+          ...(isOversized ? { "Oversized Part": "Yes - Requires Manual Review" } : {}),
           _file_name:    modelName,
         },
       });
@@ -369,6 +389,16 @@ export default function ConfigPanel({
         </div>
       )}
 
+      {/* ── Oversize Warning ─────────────────────────────────────────────────── */}
+      {isOversized && !cartError && (
+        <div className="mx-4 mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
+          <AlertCircle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-amber-500 leading-snug">
+            <strong>Oversized Part:</strong> This model exceeds the standard {printType} build volume ({BUILD_VOLUME[printType].l}x{BUILD_VOLUME[printType].w}x{BUILD_VOLUME[printType].h}mm). Your order will be submitted for manual review.
+          </p>
+        </div>
+      )}
+
       {/* ── Custom Order Note ─────────────────────────────────────────────────── */}
       <div className="px-4 mt-2">
         <textarea
@@ -394,6 +424,8 @@ export default function ConfigPanel({
         >
           {isAddingToCart ? (
             <><Loader2 size={16} className="animate-spin" /> Generating Checkout...</>
+          ) : isOversized ? (
+            <><ShoppingCart size={16} /> Request Manual Review</>
           ) : (
             <><ShoppingCart size={16} /> Proceed to Checkout</>
           )}
