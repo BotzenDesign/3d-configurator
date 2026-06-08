@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Minus, Plus, Loader2, AlertCircle, ShoppingCart } from "lucide-react";
+import { Minus, Plus, Loader2, AlertCircle, ShoppingCart, Mail } from "lucide-react";
 import { createCheckout } from "@/lib/shopifyClient";
 import { useQuote } from "@/hooks/useQuote";
 import PriceBreakdown from "./PriceBreakdown";
@@ -192,6 +192,27 @@ export default function ConfigPanel({
       setCartError("Please upload a 3D file first to generate a quote.");
       return;
     }
+
+    if (isOversized) {
+      const subject = encodeURIComponent(`Manual Review Request: Custom 3D Print - ${modelName}`);
+      const body = encodeURIComponent(
+        `Hi Botzen team,\n\n` +
+        `I would like to request a manual review for an oversized part.\n\n` +
+        `Details:\n` +
+        `- File: ${modelName}\n` +
+        `- Dimensions: ${modelStats.dimensions}\n` +
+        `- Print Type: ${printType}\n` +
+        `- Material: ${currentMaterial?.label || "Unknown"}\n` +
+        `- Color: ${availableColors[colorIdx] || "Unknown"}\n` +
+        `- Quantity: ${quantity}\n` +
+        `- Notes: ${customNote.trim() || "None"}\n\n` +
+        `Please let me know how to proceed.\n\n` +
+        `Thank you.`
+      );
+      window.location.href = `mailto:info@botzendesign.com?subject=${subject}&body=${body}`;
+      return;
+    }
+
     setIsAddingToCart(true);
     try {
       const result = await createCheckout({
@@ -228,7 +249,14 @@ export default function ConfigPanel({
 
       {/* ── Live Price ───────────────────────────────────────────────────────── */}
       <div className="p-5 text-center border-b border-border">
-        {quote && !isQuoteLoading ? (
+        {isOversized ? (
+          <>
+            <div className="text-3xl font-black tracking-tight text-amber-500">
+              Oversized
+            </div>
+            <div className="text-sm text-muted-foreground mt-1">Manual review required</div>
+          </>
+        ) : quote && !isQuoteLoading ? (
           <>
             <div className="text-5xl font-black tracking-tight text-foreground">
               {quote.display.perUnit}
@@ -425,21 +453,23 @@ export default function ConfigPanel({
           {isAddingToCart ? (
             <><Loader2 size={16} className="animate-spin" /> Generating Checkout...</>
           ) : isOversized ? (
-            <><ShoppingCart size={16} /> Request Manual Review</>
+            <><Mail size={16} /> Request Manual Review</>
           ) : (
             <><ShoppingCart size={16} /> Proceed to Checkout</>
           )}
         </button>
       </div>
         {/* Summary */}
-        <PriceBreakdown 
-          quote={quote}
-          isLoading={isQuoteLoading}
-          error={quoteError}
-          hasFile={!!activeFile}
-          modelStats={modelStats}
-          printType={printType}
-        />
+        {!isOversized && (
+          <PriceBreakdown 
+            quote={quote}
+            isLoading={isQuoteLoading}
+            error={quoteError}
+            hasFile={!!activeFile}
+            modelStats={modelStats}
+            printType={printType}
+          />
+        )}
     </div>
   );
 }
