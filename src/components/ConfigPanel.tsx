@@ -198,17 +198,17 @@ export default function ConfigPanel({
       const subject = encodeURIComponent(`Manual Review Request: Custom 3D Print - ${modelName}`);
       const reason = isOversized ? "an oversized part" : "a custom order request";
       const body = encodeURIComponent(
-        `Hi Botzen team,\n\n` +
-        `I would like to request a manual review for ${reason}.\n\n` +
-        `Details:\n` +
-        `- File: ${modelName}\n` +
-        `- Dimensions: ${modelStats.dimensions}\n` +
-        `- Print Type: ${printType}\n` +
-        `- Material: ${currentMaterial?.label || "Unknown"}\n` +
-        `- Color: ${availableColors[colorIdx] || "Unknown"}\n` +
-        `- Quantity: ${quantity}\n` +
-        `- Notes: ${customNote.trim() || "None"}\n\n` +
-        `Please let me know how to proceed.\n\n` +
+        `Hi Botzen team,\r\n\r\n` +
+        (hasCustomNote ? `Customer Note:\r\n"${customNote.trim()}"\r\n\r\n` : "") +
+        `I would like to request a manual review for ${reason}.\r\n\r\n` +
+        `Order Details:\r\n` +
+        `- File: ${modelName}\r\n` +
+        `- Dimensions: ${modelStats.dimensions}\r\n` +
+        `- Print Type: ${printType}\r\n` +
+        `- Material: ${currentMaterial?.label || "Unknown"}\r\n` +
+        `- Color: ${availableColors[colorIdx] || "Unknown"}\r\n` +
+        `- Quantity: ${quantity}\r\n\r\n` +
+        `Please let me know how to proceed.\r\n\r\n` +
         `Thank you.`
       );
       window.location.href = `mailto:info@botzendesign.com?subject=${subject}&body=${body}`;
