@@ -193,11 +193,13 @@ export default function ConfigPanel({
       return;
     }
 
-    if (isOversized) {
+    const hasCustomNote = customNote.trim() !== "";
+    if (isOversized || hasCustomNote) {
       const subject = encodeURIComponent(`Manual Review Request: Custom 3D Print - ${modelName}`);
+      const reason = isOversized ? "an oversized part" : "a custom order request";
       const body = encodeURIComponent(
         `Hi Botzen team,\n\n` +
-        `I would like to request a manual review for an oversized part.\n\n` +
+        `I would like to request a manual review for ${reason}.\n\n` +
         `Details:\n` +
         `- File: ${modelName}\n` +
         `- Dimensions: ${modelStats.dimensions}\n` +
@@ -454,6 +456,8 @@ export default function ConfigPanel({
             <><Loader2 size={16} className="animate-spin" /> Generating Checkout...</>
           ) : isOversized ? (
             <><Mail size={16} /> Request Manual Review</>
+          ) : customNote.trim() !== "" ? (
+            <><Mail size={16} /> Request Custom Order</>
           ) : (
             <><ShoppingCart size={16} /> Proceed to Checkout</>
           )}
