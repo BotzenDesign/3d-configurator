@@ -831,8 +831,10 @@ export interface EstimationResult {
   raftVolumeCm3: number;
   /** Total volume including support and raft */
   totalVolumeCm3: number;
-  /** Total filament length in meters (A in formula) */
+  /** Total filament length in meters */
   filamentLengthM: number;
+  /** Total weight in grams (A in FDM formula) */
+  weightGrams: number;
   /** Print time estimate in minutes */
   estimatedPrintMinutes: number;
   /** Print time formatted */
@@ -905,6 +907,10 @@ export class MaterialEstimationEngine {
       printTimeMinutes = Math.round(extrusionTimeSeconds / 60);
     }
 
+    // 7. Weight Calculation
+    // Using average density: 1.24 g/cm3 for FDM (PLA/PETG avg), 1.1 g/cm3 for SLA
+    const weightGrams = isSLA ? totalVolumeCm3 * 1.1 : totalVolumeCm3 * 1.24;
+
     const estimatedPrintTime = formatPrintTime(printTimeMinutes);
 
     return {
@@ -915,6 +921,7 @@ export class MaterialEstimationEngine {
       raftVolumeCm3: +raftVolumeCm3.toFixed(3),
       totalVolumeCm3: +totalVolumeCm3.toFixed(3),
       filamentLengthM: +(isSLA ? 0 : finalFilamentLengthM).toFixed(2),
+      weightGrams: +weightGrams.toFixed(2),
       estimatedPrintMinutes: printTimeMinutes,
       estimatedPrintTime,
       breakdown: {
@@ -1094,11 +1101,11 @@ export class PricingService {
       materialCost = Y * (M / Q) * B;
       materialNote = `Y(${Y}) × $${M}/${Q}mL × ${B.toFixed(2)}mL × ${quantity}pcs`;
     } else {
-      // FDM Jobs = (Y * M / L * A) + W * T
-      // A = filament length in meters
-      const A = estimation.filamentLengthM;
+      // FDM Jobs = (Y * M / Q * Weight) + W * T
+      // A = Weight in grams
+      const A = estimation.weightGrams;
       materialCost = Y * (M / Q) * A;
-      materialNote = `Y(${Y}) × $${M}/${Q}m × ${A.toFixed(2)}m × ${quantity}pcs`;
+      materialNote = `Y(${Y}) × $${M}/${Q}g × ${A.toFixed(2)}g × ${quantity}pcs`;
     }
 
     const batchMaterialCost = materialCost * quantity;
@@ -1182,7 +1189,7 @@ export class PricingService {
         perUnit: formatUsd(perUnitUsd),
         discount: discountPct > 0 ? `-${discountPct}% (${formatUsd(discountAmountUsd)})` : 'None',
         printTime: estimation.estimatedPrintTime,
-        weight: isSLA ? `${estimation.totalVolumeCm3.toFixed(2)} mL` : `${estimation.filamentLengthM.toFixed(2)} m`,
+        weight: isSLA ? `${estimation.totalVolumeCm3.toFixed(2)} mL` : `${estimation.weightGrams.toFixed(2)} g`,
       },
 
       needsRepair,
@@ -1327,8 +1334,8 @@ Deno.serve(async (req) => {
         id:              mat.id,
         name:            mat.label,
         costPerGram:     Number(mat.cost_per_gram),
-        spoolCost:       Number(mat.spool_cost ?? mat.cost_per_gram * (isSLA ? 1000 : 335)),
-        spoolQuantity:   Number(mat.spool_quantity ?? (isSLA ? 1000 : 335)),
+        spoolCost:       Number(mat.spool_cost ?? mat.cost_per_gram * (isSLA ? 1000 : 1000)),
+        spoolQuantity:   Number(mat.spool_quantity ?? (isSLA ? 1000 : 1000)),
         maxSpeedMms:     isSLA ? 0 : 80,
         isResin:         isSLA,
         description:     mat.price_label,
