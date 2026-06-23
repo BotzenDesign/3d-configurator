@@ -866,14 +866,14 @@ export class MaterialEstimationEngine {
       throw new Error(`Material with ID "${materialId}" not found in database.`);
     }
 
-    // ── FDM uses WEIGHT for cost. SLA uses VOLUME for cost (per PDF spec). ──
+    // ── FDM uses LENGTH for cost. SLA uses VOLUME for cost (per PDF spec). ──
     const isSLA = material.isResin;
 
     // 1. Effective fill ratio
     // A realistic FDM part has ~20% solid shells/walls, so 20% is solid regardless of infill.
-    // SLA is always 100% solid.
+    // Client requested SLA to use the SAME calculator (scaling with density).
     const shellRatio = 0.20;
-    const fillRatio = isSLA ? 1.0 : (shellRatio + (1 - shellRatio) * (infill.percentage / 100));
+    const fillRatio = shellRatio + (1 - shellRatio) * (infill.percentage / 100);
     const effectiveVolumeCm3 = volumeCm3 * fillRatio;
 
     // 3. Support material (Removed per client request)
@@ -1102,11 +1102,11 @@ export class PricingService {
       materialCost = Y * (M / Q) * B;
       materialNote = `Y(${Y}) × $${M}/${Q}mL × ${B.toFixed(2)}mL × ${quantity}pcs`;
     } else {
-      // FDM Jobs = (Y * M / Q * Weight) + W * T
-      // A = Weight in grams
-      const A = estimation.weightGrams;
+      // FDM Jobs = (Y * M / L * A) + W * T
+      // A = Length in meters
+      const A = estimation.filamentLengthM;
       materialCost = Y * (M / Q) * A;
-      materialNote = `Y(${Y}) × $${M}/${Q}g × ${A.toFixed(2)}g × ${quantity}pcs`;
+      materialNote = `Y(${Y}) × $${M}/${Q}m × ${A.toFixed(2)}m × ${quantity}pcs`;
     }
 
     const batchMaterialCost = materialCost * quantity;
