@@ -50,6 +50,7 @@ interface ConfigPanelProps {
   modelStats: { dimensions: string; volume: string; surface: string; weight: string };
   modelName?: string;
   uploadedFile?: File | null;
+  isOversized: boolean;
 }
 
 export default function ConfigPanel({
@@ -60,6 +61,7 @@ export default function ConfigPanel({
   modelStats,
   modelName = "bear.stl",
   uploadedFile: externalFile = null,
+  isOversized,
 }: ConfigPanelProps) {
   // Print type toggle
   const [printType, setPrintType] = useState<PrintType>("FDM");
@@ -136,19 +138,6 @@ export default function ConfigPanel({
 
   // Infill value — SLA is always 100%
   const effectiveInfill = printType === "SLA" ? 100 : INFILL_OPTIONS[infillIdx].value;
-
-  // Check if model exceeds max build volume
-  const isOversized = useMemo(() => {
-    if (!modelStats.dimensions || modelStats.dimensions === "0mm x 0mm x 0mm") return false;
-    const dims = modelStats.dimensions.split('x').map(s => parseFloat(s)).filter(n => !isNaN(n));
-    if (dims.length !== 3) return false;
-    
-    const bv = BUILD_VOLUME[printType];
-    const bedDims = [bv.l, bv.w, bv.h].sort((a,b) => b-a);
-    const partDims = dims.sort((a,b) => b-a);
-    
-    return partDims[0] > bedDims[0] || partDims[1] > bedDims[1] || partDims[2] > bedDims[2];
-  }, [modelStats.dimensions, printType]);
 
   // ── Real-time quote ─────────────────────────────────────────────────────────
   const { quote, isLoading: isQuoteLoading, error: quoteError } = useQuote({

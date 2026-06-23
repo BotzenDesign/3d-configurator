@@ -32,6 +32,7 @@ interface ModelViewerProps {
   geometry: THREE.BufferGeometry | null;
   printType?: "FDM" | "SLA";
   realDimensions?: string; // e.g. "102mm x 152mm x 155mm" from STL parser
+  isOversized?: boolean;
 }
 
 // ── Build Volume Constants ───────────────────────────────────────────────
@@ -340,7 +341,7 @@ function ViewerToolbar({
 }
 
 // ── Main Viewer ──────────────────────────────────────────────────────────
-export default function ModelViewer({ modelType, color, geometry, printType = "FDM", realDimensions }: ModelViewerProps) {
+export default function ModelViewer({ modelType, color, geometry, printType = "FDM", realDimensions, isOversized }: ModelViewerProps) {
   const device = useDeviceCapabilities();
   const [showDimensions, setShowDimensions] = useState(!device.isMobile);
   const [showWireframe, setShowWireframe] = useState(false);
@@ -417,7 +418,7 @@ export default function ModelViewer({ modelType, color, geometry, printType = "F
             {/* Environment — skip on low-end devices */}
             {device.enableEnvironment && <Environment preset="studio" />}
 
-            <PrintBed printType={printType} />
+            <PrintBed printType={printType} isOversized={isOversized} />
 
             {/* Contact shadows — skip on low-end devices */}
             {device.enableShadows && (

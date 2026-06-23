@@ -95,6 +95,20 @@ export default function Index() {
     weight: quoteData ? quoteData.display.weight : stats.weight,
   };
 
+  const isOversized = useMemo(() => {
+    if (!stats.dimensions || stats.dimensions === "0mm x 0mm x 0mm") return false;
+    const dims = stats.dimensions.split('x').map(s => parseFloat(s)).filter(n => !isNaN(n));
+    if (dims.length !== 3) return false;
+    
+    // Sort dimensions so that we check if the part CAN fit inside the bounding box in any orthogonal orientation
+    const bv = printType === "FDM" ? { l: 330, w: 240, h: 300 } : { l: 200, w: 125, h: 210 };
+    const bedDims = [bv.l, bv.w, bv.h].sort((a, b) => a - b);
+    const partDims = dims.sort((a, b) => a - b);
+    
+    // Check if the part's smallest dimension fits in the bed's smallest dimension, etc.
+    return partDims[0] > bedDims[0] || partDims[1] > bedDims[1] || partDims[2] > bedDims[2];
+  }, [stats.dimensions, printType]);
+
   // ── Mobile Layout ──────────────────────────────────────────────────────
   if (isMobile) {
     return (
@@ -151,9 +165,11 @@ export default function Index() {
                 onPrintTypeChange={setPrintType}
                 onQuoteUpdate={setQuoteData}
                 selectedColor={color}
-                modelStats={stats}
+                printType={printType}
+                modelStats={displayStats}
                 modelName={modelName}
                 uploadedFile={uploadedFile}
+                isOversized={isOversized}
               />
             </div>
           )}
@@ -191,9 +207,11 @@ export default function Index() {
           onPrintTypeChange={setPrintType}
           onQuoteUpdate={setQuoteData}
           selectedColor={color}
-          modelStats={stats}
+          printType={printType}
+          modelStats={displayStats}
           modelName={modelName}
           uploadedFile={uploadedFile}
+          isOversized={isOversized}
         />
         <div className="flex-1 relative">
           <ModelViewer
@@ -202,6 +220,7 @@ export default function Index() {
             geometry={uploadedGeometry}
             printType={printType}
             realDimensions={stats.dimensions}
+            isOversized={isOversized}
           />
           <ModelStats {...displayStats} modelName={modelName} />
           <ModelSelector
