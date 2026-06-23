@@ -869,8 +869,11 @@ export class MaterialEstimationEngine {
     // ── FDM uses WEIGHT for cost. SLA uses VOLUME for cost (per PDF spec). ──
     const isSLA = material.isResin;
 
-    // 1. Effective fill ratio (Strict math)
-    const fillRatio = isSLA ? 1.0 : (infill.percentage / 100);
+    // 1. Effective fill ratio
+    // A realistic FDM part has ~20% solid shells/walls, so 20% is solid regardless of infill.
+    // SLA is always 100% solid.
+    const shellRatio = 0.20;
+    const fillRatio = isSLA ? 1.0 : (shellRatio + (1 - shellRatio) * (infill.percentage / 100));
     const effectiveVolumeCm3 = volumeCm3 * fillRatio;
 
     // 3. Support material (Removed per client request)
@@ -883,29 +886,27 @@ export class MaterialEstimationEngine {
     const totalVolumeCm3 = effectiveVolumeCm3 + supportVolumeCm3 + raftVolumeCm3;
 
     // 6. Print time estimate
-    let printTimeMinutes = 0;
-    let finalFilamentLengthM = 0;
-
-    if (isSLA) {
-      // SLA: Pure geometric time based on layer count and standard 10s per layer (defaulting to 0.05mm layer height)
-      const layerCount = Math.ceil(size.z / 0.05);
-      const totalExposureSeconds = layerCount * 10;
-                                  
-      printTimeMinutes = Math.max(1, Math.round(totalExposureSeconds / 60));
-    } else {
-      // FDM: Pure geometric length
-      const filamentArea = Math.PI * Math.pow(FILAMENT_DIAMETER_MM / 2, 2);
-      
-      const extrusionVolumeMm3 = totalVolumeCm3 * 1000;
-      finalFilamentLengthM = (extrusionVolumeMm3 / filamentArea) / 1000;
-      
-      // Update print time using pure travel speed
-      const printSpeedMms = Math.max(1, Math.min(material.maxSpeedMms, 60));
-      const totalTravelMm = finalFilamentLengthM * 1000;
-      const extrusionTimeSeconds = totalTravelMm / printSpeedMms;
-      
-      printTimeMinutes = Math.round(extrusionTimeSeconds / 60);
-    }
+    // Client requested: "Since we only use one calculator for both processes. Should they not be the same??"
+    // We now use the exact same volume-based time calculation for BOTH FDM and SLA.
+    const extrusionVolumeMm3 = totalVolumeCm3 * 1000;
+    
+    // Calculate filament length (for any legacy logging, though we use weight now)
+    const filamentArea = Math.PI * Math.pow(FILAMENT_DIAMETER_MM / 2, 2);
+    const finalFilamentLengthM = (extrusionVolumeMm3 / filamentArea) / 1000;
+    
+    // Calculate empirical flow rate: ~15 mm3/s is typical for modern printing at 80 mm/s.
+    // Ratio = 15 / 80 = 0.1875
+    // For SLA, material.maxSpeedMms is 0, so it defaults to 20mm/s below, 
+    // but typically we can treat SLA equivalent flow rate similarly if using one calculator.
+    const printSpeedMms = Math.max(20, material.maxSpeedMms || 80);
+    const volumetricFlowRateMm3PerSec = printSpeedMms * 0.1875;
+    
+    const extrusionTimeSeconds = extrusionVolumeMm3 / volumetricFlowRateMm3PerSec;
+    
+    // Add a 20% penalty for travel moves, heating, retractions, and Z-hops
+    const totalTimeSeconds = extrusionTimeSeconds * 1.2;
+    
+    const printTimeMinutes = Math.max(1, Math.round(totalTimeSeconds / 60));
 
     // 7. Weight Calculation
     // Using average density: 1.24 g/cm3 for FDM (PLA/PETG avg), 1.1 g/cm3 for SLA

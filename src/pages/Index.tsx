@@ -34,6 +34,7 @@ export default function Index() {
   const [uploadedGeometry, setUploadedGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [stats, setStats] = useState(DEFAULT_STATS);
+  const [quoteData, setQuoteData] = useState<any>(null);
   const [mobileTab, setMobileTab] = useState<"viewer" | "config">("viewer");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
@@ -89,6 +90,11 @@ export default function Index() {
     // Only upload is used now
   }, []);
 
+  const displayStats = {
+    ...stats,
+    weight: quoteData ? quoteData.display.weight : stats.weight,
+  };
+
   // ── Mobile Layout ──────────────────────────────────────────────────────
   if (isMobile) {
     return (
@@ -130,7 +136,7 @@ export default function Index() {
                 printType={printType}
                 realDimensions={stats.dimensions}
               />
-              <ModelStats {...stats} modelName={modelName} />
+              <ModelStats {...displayStats} modelName={modelName} />
               <ModelSelector
                 selected={modelType}
                 onSelect={handleModelSelect}
@@ -143,6 +149,7 @@ export default function Index() {
                 onFileUpload={handleFileUpload}
                 onColorChange={setColor}
                 onPrintTypeChange={setPrintType}
+                onQuoteUpdate={setQuoteData}
                 selectedColor={color}
                 modelStats={stats}
                 modelName={modelName}
@@ -182,6 +189,7 @@ export default function Index() {
           onFileUpload={handleFileUpload}
           onColorChange={setColor}
           onPrintTypeChange={setPrintType}
+          onQuoteUpdate={setQuoteData}
           selectedColor={color}
           modelStats={stats}
           modelName={modelName}
@@ -195,7 +203,7 @@ export default function Index() {
             printType={printType}
             realDimensions={stats.dimensions}
           />
-          <ModelStats {...stats} modelName={modelName} />
+          <ModelStats {...displayStats} modelName={modelName} />
           <ModelSelector
             selected={modelType}
             onSelect={handleModelSelect}

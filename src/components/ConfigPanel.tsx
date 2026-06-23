@@ -45,6 +45,7 @@ interface ConfigPanelProps {
   onFileUpload: (file: File) => void;
   onColorChange: (hex: string) => void;
   onPrintTypeChange?: (type: PrintType) => void;
+  onQuoteUpdate?: (quote: any) => void;
   selectedColor: string;
   modelStats: { dimensions: string; volume: string; surface: string; weight: string };
   modelName?: string;
@@ -55,6 +56,7 @@ export default function ConfigPanel({
   onFileUpload,
   onColorChange,
   onPrintTypeChange,
+  onQuoteUpdate,
   modelStats,
   modelName = "bear.stl",
   uploadedFile: externalFile = null,
@@ -156,6 +158,12 @@ export default function ConfigPanel({
     quantity,
     debounceMs: 700,
   });
+
+  useEffect(() => {
+    if (quote && onQuoteUpdate) {
+      onQuoteUpdate(quote);
+    }
+  }, [quote, onQuoteUpdate]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handlePrintTypeChange = (type: PrintType) => {
