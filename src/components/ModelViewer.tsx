@@ -225,11 +225,18 @@ function UploadedModel({
     // Tilt: laydown = rotate 90° around X axis (lies flat on print bed)
     if (tilt === "laydown") {
       g.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-      // Re-seat on bed: shift down so bottom face touches Y=0
-      g.computeBoundingBox();
-      const tiltedBox = g.boundingBox!;
-      g.translate(0, -tiltedBox.min.y, 0);
     }
+
+    // Always ensure perfectly centered at the end of any transformations
+    g.computeBoundingBox();
+    const finalBox = g.boundingBox!;
+    const finalCenter = new THREE.Vector3();
+    finalBox.getCenter(finalCenter);
+    const finalSize = new THREE.Vector3();
+    finalBox.getSize(finalSize);
+    
+    // Shift so that X and Z are centered at 0, and minimum Y is at 0 (sitting flat on the bed)
+    g.translate(-finalCenter.x, -finalCenter.y + finalSize.y / 2, -finalCenter.z);
 
     setProcessedGeo(g);
 

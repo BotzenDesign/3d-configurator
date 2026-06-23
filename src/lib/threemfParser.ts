@@ -23,12 +23,15 @@ export async function parse3MF(buffer: ArrayBuffer): Promise<THREE.BufferGeometr
   const geometry = new THREE.BufferGeometry();
   const positions: number[] = [];
 
-  // Parse all objects (in a robust parser we'd handle components/build items,
-  // but for basic viewing, extracting all meshes from resources is often sufficient).
+  // Parse all objects into a map
   const objects = xmlDoc.getElementsByTagName('object');
+  const objectMap = new Map<string, THREE.Vector3[]>();
   
   for (let i = 0; i < objects.length; i++) {
     const obj = objects[i];
+    const id = obj.getAttribute('id');
+    if (!id) continue;
+
     const mesh = obj.getElementsByTagName('mesh')[0];
     if (!mesh) continue;
 
@@ -47,7 +50,8 @@ export async function parse3MF(buffer: ArrayBuffer): Promise<THREE.BufferGeometr
       tempVerts.push(new THREE.Vector3(x, y, z));
     }
 
-    // Parse triangles
+    // Parse triangles and flatten into unindexed vector list
+    const objectPositions: THREE.Vector3[] = [];
     const triangleList = trianglesEl.getElementsByTagName('triangle');
     for (let j = 0; j < triangleList.length; j++) {
       const t = triangleList[j];
@@ -55,15 +59,54 @@ export async function parse3MF(buffer: ArrayBuffer): Promise<THREE.BufferGeometr
       const v2 = parseInt(t.getAttribute('v2') || '0', 10);
       const v3 = parseInt(t.getAttribute('v3') || '0', 10);
 
-      // Add to positions array (unindexed geometry format for simplicity and consistency with STL)
-      if (tempVerts[v1]) {
-        positions.push(tempVerts[v1].x, tempVerts[v1].y, tempVerts[v1].z);
+      if (tempVerts[v1]) objectPositions.push(tempVerts[v1].clone());
+      if (tempVerts[v2]) objectPositions.push(tempVerts[v2].clone());
+      if (tempVerts[v3]) objectPositions.push(tempVerts[v3].clone());
+    }
+
+    objectMap.set(id, objectPositions);
+  }
+
+  // Parse <build> <item> to apply scene transforms
+  const buildItems = xmlDoc.getElementsByTagName('build')[0]?.getElementsByTagName('item');
+  let hasValidBuildItems = false;
+
+  if (buildItems && buildItems.length > 0) {
+    for (let i = 0; i < buildItems.length; i++) {
+      const item = buildItems[i];
+      const objectid = item.getAttribute('objectid');
+      if (!objectid || !objectMap.has(objectid)) continue;
+
+      hasValidBuildItems = true;
+      const transformStr = item.getAttribute('transform');
+      const transformMatrix = new THREE.Matrix4();
+
+      if (transformStr) {
+        // "m00 m01 m02 m10 m11 m12 m20 m21 m22 m30 m31 m32"
+        const floats = transformStr.trim().split(/\s+/).map(parseFloat);
+        if (floats.length === 12) {
+          transformMatrix.set(
+            floats[0], floats[3], floats[6], floats[9],
+            floats[1], floats[4], floats[7], floats[10],
+            floats[2], floats[5], floats[8], floats[11],
+            0,         0,         0,         1
+          );
+        }
       }
-      if (tempVerts[v2]) {
-        positions.push(tempVerts[v2].x, tempVerts[v2].y, tempVerts[v2].z);
+
+      const itemVerts = objectMap.get(objectid)!;
+      for (const v of itemVerts) {
+        const transformedV = v.clone().applyMatrix4(transformMatrix);
+        positions.push(transformedV.x, transformedV.y, transformedV.z);
       }
-      if (tempVerts[v3]) {
-        positions.push(tempVerts[v3].x, tempVerts[v3].y, tempVerts[v3].z);
+    }
+  }
+
+  // Fallback: If no build items, just dump all object vertices
+  if (!hasValidBuildItems) {
+    for (const itemVerts of objectMap.values()) {
+      for (const v of itemVerts) {
+        positions.push(v.x, v.y, v.z);
       }
     }
   }
