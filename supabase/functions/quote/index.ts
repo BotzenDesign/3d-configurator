@@ -1092,23 +1092,12 @@ export class PricingService {
     const T = estimation.estimatedPrintMinutes / 60; // print time in hours
 
     // ── 1. Material Cost ─────────────────────────────────────────────────────
-    let materialCost = 0;
-    let materialNote = '';
-
-    if (isSLA) {
-      // SLA Jobs = (Y * M / V * B) + W * T
-      // B = total volume in mL (effective + support + raft)
-      const B = estimation.totalVolumeCm3;
-      materialCost = Y * (M / Q) * B;
-      materialNote = `Y(${Y}) × $${M}/${Q}mL × ${B.toFixed(2)}mL × ${quantity}pcs`;
-    } else {
-      // FDM Jobs = (Y * M / L * A) + W * T
-      // A = Length in meters
-      const A = estimation.filamentLengthM;
-      materialCost = Y * (M / Q) * A;
-      materialNote = `Y(${Y}) × $${M}/${Q}m × ${A.toFixed(2)}m × ${quantity}pcs`;
-    }
-
+    // Both FDM and SLA use the same formula based on WEIGHT (B = material consumed in grams)
+    // Formula: Material Cost = Y * (M / Q) * B
+    const B = estimation.weightGrams;
+    const materialCost = Y * (M / Q) * B;
+    const materialNote = `Y(${Y}) × $${M}/${Q}g × ${B.toFixed(2)}g × ${quantity}pcs`;
+    
     const batchMaterialCost = materialCost * quantity;
 
     lineItems.push({
@@ -1160,21 +1149,13 @@ export class PricingService {
     const totalMl    = +estimation.totalVolumeCm3.toFixed(2);
 
     // ── Cost breakdown (Pure Material) ───────────────────────────────────────
-    let modelCost = 0;
-    let supportRaftCost = 0;
-    let totalMaterialCost = materialCost; // already calculated per unit
-
-    if (isSLA) {
-      const costPerVolume = (M / Q);
-      modelCost = estimation.effectiveVolumeCm3 * costPerVolume * Y;
-      supportRaftCost = (estimation.supportVolumeCm3 + estimation.raftVolumeCm3) * costPerVolume * Y;
-    } else {
-      // For FDM, we don't have separate length breakdown for support/raft vs model,
-      // so we approximate it via volume ratio
-      const ratio = totalMl > 0 ? modelMl / totalMl : 1;
-      modelCost = materialCost * ratio;
-      supportRaftCost = materialCost * (1 - ratio);
-    }
+    const totalMaterialCost = materialCost; // already calculated per unit
+    const costPerGram = M / Q;
+    
+    // For cost breakdown, we approximate it via volume ratio
+    const ratio = totalMl > 0 ? modelMl / totalMl : 1;
+    const modelCost = B * ratio * costPerGram * Y;
+    const supportRaftCost = B * (1 - ratio) * costPerGram * Y;
 
     return {
       lineItems,
