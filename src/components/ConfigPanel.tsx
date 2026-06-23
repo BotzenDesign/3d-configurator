@@ -44,7 +44,7 @@ const INFILL_OPTIONS = [
 interface ConfigPanelProps {
   onFileUpload: (file: File) => void;
   onColorChange: (hex: string) => void;
-  onPrintTypeChange?: (type: PrintType) => void;
+  onPrintTypeChange?: (type: "FDM" | "SLA") => void;
   onQuoteUpdate?: (quote: any) => void;
   selectedColor: string;
   modelStats: { dimensions: string; volume: string; surface: string; weight: string };

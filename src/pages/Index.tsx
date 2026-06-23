@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import Navbar from "@/components/Navbar";
 import ModelViewer from "@/components/ModelViewer";
@@ -165,7 +165,6 @@ export default function Index() {
                 onPrintTypeChange={setPrintType}
                 onQuoteUpdate={setQuoteData}
                 selectedColor={color}
-                printType={printType}
                 modelStats={displayStats}
                 modelName={modelName}
                 uploadedFile={uploadedFile}
@@ -207,7 +206,6 @@ export default function Index() {
           onPrintTypeChange={setPrintType}
           onQuoteUpdate={setQuoteData}
           selectedColor={color}
-          printType={printType}
           modelStats={displayStats}
           modelName={modelName}
           uploadedFile={uploadedFile}
