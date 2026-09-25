@@ -214,6 +214,32 @@ export default function ConfigPanel({
 
     setIsAddingToCart(true);
     try {
+      let fileUrl = "";
+      if (activeFile) {
+        const fileExt = activeFile.name.split('.').pop();
+        const uniqueId = Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+        const filePath = `${uniqueId}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('3d_models')
+          .upload(filePath, activeFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+          
+        if (uploadError) {
+          console.error("Storage upload error:", uploadError);
+          // If the bucket doesn't exist, this will throw an error to the user
+          throw new Error(`Failed to upload file to storage: ${uploadError.message}. Make sure '3d_models' bucket is created and public.`);
+        }
+        
+        const { data: publicUrlData } = supabase.storage
+          .from('3d_models')
+          .getPublicUrl(filePath);
+          
+        fileUrl = publicUrlData.publicUrl;
+      }
+
       const result = await createCheckout({
         title: `Custom 3D Print - ${modelName}`,
         quantity,
@@ -231,6 +257,7 @@ export default function ConfigPanel({
           ...(customNote.trim() ? { "Order Note": customNote.trim() } : {}),
           ...(isOversized ? { "Oversized Part": "Yes - Requires Manual Review" } : {}),
           _file_name:    modelName,
+          ...(fileUrl ? { "File Download Link": fileUrl } : {}),
         },
       });
       if (result.success && result.checkoutUrl) {
