@@ -244,6 +244,7 @@ export default function ConfigPanel({
         title: `Custom 3D Print - ${modelName}`,
         quantity,
         price: Math.round((quote?.perUnitUsd ?? 0) * 100),
+        weight_in_grams: parseFloat(quote?.display.weight ?? modelStats.weight) || 0,
         properties: {
           "Print Type":  printType,
           Material:      currentMaterial?.label || "Unknown",

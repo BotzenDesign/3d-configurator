@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { title, price, quantity, properties } = body;
+    const { title, price, quantity, properties, weight_in_grams } = body;
 
     const shopDomain = Deno.env.get("VITE_SHOPIFY_DOMAIN");
     if (!shopDomain) {
@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
             title: title || "Custom 3D Print",
             price: (price / 100).toFixed(2), // Price comes in as cents
             quantity: quantity || 1,
+            grams: weight_in_grams ? Math.round(weight_in_grams) : 0,
             properties: customProperties,
             requires_shipping: true,
             taxable: true,

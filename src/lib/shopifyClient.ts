@@ -26,6 +26,7 @@ export interface CreateCheckoutInput {
   title: string;
   quantity: number;
   price: number; // in cents
+  weight_in_grams?: number;
   properties: CheckoutLineItemProperties;
 }
 
@@ -53,6 +54,7 @@ export async function createCheckout(input: CreateCheckoutInput): Promise<Checko
     title: input.title,
     quantity: input.quantity,
     price: input.price,
+    weight_in_grams: input.weight_in_grams,
     properties: cleanProperties
   };
 
