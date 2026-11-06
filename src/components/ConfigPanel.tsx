@@ -35,10 +35,11 @@ const COLOR_HEX: Record<string, string> = {
 
 // ── FDM Infill options ────────────────────────────────────────────────────────
 const INFILL_OPTIONS = [
-  { label: "Light (10%)",    value: 10  },
-  { label: "Standard (20%)", value: 20  },
-  { label: "Dense (40%)",    value: 40  },
-  { label: "Solid (100%)",   value: 100 },
+  { label: "Standard (20%)",    value: 20  },
+  { label: "Medium (40%)",      value: 40  },
+  { label: "Dense (60%)",       value: 60  },
+  { label: "Extra Dense (80%)", value: 80  },
+  { label: "Solid (100%)",      value: 100 },
 ];
 
 interface ConfigPanelProps {
@@ -74,7 +75,7 @@ export default function ConfigPanel({
   const [materialIdx, setMaterialIdx] = useState(0);
 
   // Infill (SLA is always 100)
-  const [infillIdx, setInfillIdx] = useState(1); // default: Standard 20%
+  const [infillIdx, setInfillIdx] = useState(0); // default: Standard 20%
 
   // Quantity
   const [quantity, setQuantity] = useState(1);
@@ -137,7 +138,7 @@ export default function ConfigPanel({
   }, [materials.length, materialIdx, colorIdx, availableColors]);
 
   // Infill value — SLA is always 100%
-  const effectiveInfill = printType === "SLA" ? 100 : INFILL_OPTIONS[infillIdx].value;
+  const effectiveInfill = printType === "SLA" ? 100 : (INFILL_OPTIONS[infillIdx]?.value ?? 20);
 
   // ── Real-time quote ─────────────────────────────────────────────────────────
   const { quote, isLoading: isQuoteLoading, error: quoteError } = useQuote({

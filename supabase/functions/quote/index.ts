@@ -985,6 +985,8 @@ export interface PricingConfig {
   runTimeMultiplierW: number;
   /** Base setup fee per order in USD */
   setupFeeUsd: number;
+  /** Infill multipliers per percentage (e.g. 20, 40, 60, 80, 100) */
+  infillMultipliers?: Record<number, number>;
 }
 
 const DEFAULT_CONFIG: PricingConfig = {
@@ -992,6 +994,13 @@ const DEFAULT_CONFIG: PricingConfig = {
   materialMultiplierY: 2.5,   // Y: Increased to 2.5x for better overhead coverage
   runTimeMultiplierW:  5.00,  // W: Increased to $5.00/hr (industry average for FDM/SLA)
   setupFeeUsd:         15.00, // Default setup fee
+  infillMultipliers: {
+    20: 1.0,
+    40: 1.15,
+    60: 1.30,
+    80: 1.50,
+    100: 1.80,
+  },
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -1091,12 +1100,19 @@ export class PricingService {
     const Q = mat.spoolQuantity;           // spool/bottle quantity (L or V)
     const T = estimation.estimatedPrintMinutes / 60; // print time in hours
 
+    // ── Infill Price Multiplier (FDM only; SLA is always 100% solid) ─────────
+    const infillPercentage = estimation.infill?.percentage ?? 20;
+    const infillMultiplier = isSLA ? 1.0 : (config.infillMultipliers?.[infillPercentage] ?? 1.0);
+
     // ── 1. Material Cost ─────────────────────────────────────────────────────
     // Both FDM and SLA use the same formula based on WEIGHT (B = material consumed in grams)
-    // Formula: Material Cost = Y * (M / Q) * B
+    // Formula: Material Cost = Y * (M / Q) * B * InfillMultiplier
     const B = estimation.weightGrams;
-    const materialCost = Y * (M / Q) * B;
-    const materialNote = `Y(${Y}) × $${M}/${Q}g × ${B.toFixed(2)}g × ${quantity}pcs`;
+    const baseMaterialCost = Y * (M / Q) * B;
+    const materialCost = baseMaterialCost * infillMultiplier;
+    const materialNote = infillMultiplier !== 1.0
+      ? `Y(${Y}) × $${M}/${Q}g × ${B.toFixed(2)}g × Infill(${infillMultiplier}x) × ${quantity}pcs`
+      : `Y(${Y}) × $${M}/${Q}g × ${B.toFixed(2)}g × ${quantity}pcs`;
     
     const batchMaterialCost = materialCost * quantity;
 
@@ -1107,13 +1123,16 @@ export class PricingService {
     });
 
     // ── 2. Machine Run Time ──────────────────────────────────────────────────
-    // W × T  (applies to both FDM and SLA)
-    const machineCost = W * T;
+    // W × T * InfillMultiplier
+    const baseMachineCost = W * T;
+    const machineCost = baseMachineCost * infillMultiplier;
     const totalMachineCost = machineCost * quantity;
     lineItems.push({
       label: 'Machine Run Time',
       amountUsd: +totalMachineCost.toFixed(4),
-      note: `W(${W}) × ${estimation.estimatedPrintTime} × ${quantity}pcs (${(T * quantity).toFixed(2)}h total)`,
+      note: infillMultiplier !== 1.0
+        ? `W(${W}) × ${estimation.estimatedPrintTime} × Infill(${infillMultiplier}x) × ${quantity}pcs`
+        : `W(${W}) × ${estimation.estimatedPrintTime} × ${quantity}pcs (${(T * quantity).toFixed(2)}h total)`,
     });
 
     // ── 3. Setup & Handling Fee (Flat per order) ─────────────────────────────
@@ -1334,10 +1353,19 @@ Deno.serve(async (req) => {
       return acc;
     }, {});
 
+    const infillMultipliers: Record<number, number> = {
+      20: Number(settingsMap.infill_multiplier_20 ?? 1.0),
+      40: Number(settingsMap.infill_multiplier_40 ?? 1.15),
+      60: Number(settingsMap.infill_multiplier_60 ?? 1.30),
+      80: Number(settingsMap.infill_multiplier_80 ?? 1.50),
+      100: Number(settingsMap.infill_multiplier_100 ?? 1.80),
+    };
+
     pricingService.setConfig({
       materialMultiplierY: Number(settingsMap.material_multiplier_Y ?? 2.0),
       runTimeMultiplierW:  Number(settingsMap.run_time_multiplier_W ?? 1.25),
       setupFeeUsd:         Number(settingsMap.base_setup_fee ?? 15.00),
+      infillMultipliers,
     } as any);
     
     // Also update FileValidationService dynamic max file size if present

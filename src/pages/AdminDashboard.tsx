@@ -8,9 +8,17 @@ import { toast } from 'sonner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { LogOut, Plus, Save, Trash2, Edit } from 'lucide-react';
+import { LogOut, Plus, Save, Trash2, Edit, Sliders } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+
+const INFILL_CONFIG_KEYS = [
+  { key: 'infill_multiplier_20', percentage: 20, label: 'Standard (20%) Infill', defaultVal: '1.0', desc: 'Standard baseline infill. Recommended at 1.0 (normal price).' },
+  { key: 'infill_multiplier_40', percentage: 40, label: 'Medium (40%) Infill', defaultVal: '1.15', desc: 'Slightly denser parts for mechanical rigidity.' },
+  { key: 'infill_multiplier_60', percentage: 60, label: 'Dense (60%) Infill', defaultVal: '1.30', desc: 'High density for heavy-duty structural parts.' },
+  { key: 'infill_multiplier_80', percentage: 80, label: 'Extra Dense (80%) Infill', defaultVal: '1.50', desc: 'Near solid print for high impact resistance.' },
+  { key: 'infill_multiplier_100', percentage: 100, label: 'Solid (100%) Infill', defaultVal: '1.80', desc: '100% solid plastic. Recommended 1.50 - 2.00x multiplier.' },
+];
 
 export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
@@ -59,18 +67,55 @@ export default function AdminDashboard() {
     navigate('/admin');
   };
 
-  const handleSaveSetting = async (key: string, value: string) => {
+  const getSettingValue = (key: string, defaultVal: string = '1.0') => {
+    const s = settings.find((item) => item.key === key);
+    if (!s || s.value === undefined || s.value === null) return defaultVal;
+    if (typeof s.value === 'string') return s.value;
+    return String(s.value);
+  };
+
+  const updateSettingState = (key: string, value: string) => {
+    const newSettings = [...settings];
+    const idx = newSettings.findIndex((s) => s.key === key);
+    if (idx >= 0) {
+      newSettings[idx].value = value;
+    } else {
+      newSettings.push({ key, value });
+    }
+    setSettings(newSettings);
+  };
+
+  const handleSaveSetting = async (key: string, value: string, description?: string) => {
     try {
       const { error } = await supabase
         .from('app_settings')
-        .update({ value })
-        .eq('key', key);
+        .upsert({ 
+          key, 
+          value: JSON.parse(JSON.stringify(value)),
+          ...(description ? { description } : {})
+        }, { onConflict: 'key' });
       
       if (error) throw error;
-      toast.success(`Updated ${key}`);
+      toast.success(`Updated ${key.replace(/_/g, ' ')}`);
       fetchData();
     } catch (err: any) {
       toast.error('Failed to update setting: ' + err.message);
+    }
+  };
+
+  const handleSaveAllInfill = async () => {
+    try {
+      const upsertRows = INFILL_CONFIG_KEYS.map((item) => ({
+        key: item.key,
+        value: JSON.parse(JSON.stringify(getSettingValue(item.key, item.defaultVal))),
+        description: item.desc,
+      }));
+      const { error } = await supabase.from('app_settings').upsert(upsertRows, { onConflict: 'key' });
+      if (error) throw error;
+      toast.success('All infill multipliers updated successfully!');
+      fetchData();
+    } catch (err: any) {
+      toast.error('Failed to update infill multipliers: ' + err.message);
     }
   };
 
@@ -171,8 +216,9 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="materials" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-3 lg:w-[540px]">
             <TabsTrigger value="materials">Materials & Pricing</TabsTrigger>
+            <TabsTrigger value="infill">Infill Multipliers</TabsTrigger>
             <TabsTrigger value="settings">Global Settings</TabsTrigger>
           </TabsList>
           
@@ -265,6 +311,88 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
           
+          <TabsContent value="infill">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <Sliders className="w-5 h-5 text-primary" />
+                    Infill Density Price Multipliers
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Set a custom price multiplier for each infill density option. <strong>20% is the normal base price (1.00)</strong>.
+                  </p>
+                </div>
+                <Button onClick={handleSaveAllInfill} className="flex items-center gap-2">
+                  <Save className="w-4 h-4" /> Save All Infill Multipliers
+                </Button>
+              </div>
+
+              <div className="text-xs bg-muted/60 p-3 rounded-lg border border-border text-muted-foreground space-y-1">
+                <div>💡 <strong>How multipliers work:</strong></div>
+                <div>• <code>1.00</code> = Standard normal price (0% extra)</div>
+                <div>• <code>1.15</code> = Adds +15% extra to the calculated price</div>
+                <div>• <code>1.50</code> = Adds +50% extra to the calculated price</div>
+                <div>• <code>2.00</code> = Doubles the calculated price (100% extra)</div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {INFILL_CONFIG_KEYS.map((item) => {
+                  const rawVal = getSettingValue(item.key, item.defaultVal);
+                  const numVal = parseFloat(rawVal) || 1.0;
+                  const markupPercent = Math.round((numVal - 1.0) * 100);
+
+                  return (
+                    <div key={item.key} className="bg-background/80 p-4 rounded-xl border border-border flex flex-col justify-between space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-foreground text-sm flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                              {item.percentage}%
+                            </span>
+                            {item.label}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            markupPercent === 0
+                              ? 'bg-muted text-muted-foreground'
+                              : markupPercent > 0
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                              : 'bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300'
+                          }`}>
+                            {markupPercent === 0 ? 'Base Price (No Markup)' : markupPercent > 0 ? `+${markupPercent}% Markup` : `${markupPercent}% Discount`}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{item.desc}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <div className="relative flex-1">
+                          <Input
+                            type="number"
+                            step="0.05"
+                            min="0.1"
+                            max="10.0"
+                            value={rawVal}
+                            onChange={(e) => updateSettingState(item.key, e.target.value)}
+                            className="font-mono text-sm"
+                          />
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="secondary"
+                          onClick={() => handleSaveSetting(item.key, rawVal, item.desc)}
+                          className="flex items-center gap-1.5"
+                        >
+                          <Save className="w-3.5 h-3.5" /> Save
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </TabsContent>
+          
           <TabsContent value="settings">
             <div className="bg-card rounded-xl shadow-sm border border-border p-6">
               <div className="mb-6">
@@ -275,7 +403,7 @@ export default function AdminDashboard() {
                 </p>
               </div>
               <div className="space-y-6 max-w-xl">
-                {settings.map((setting) => {
+                {settings.filter((s) => !s.key.startsWith('infill_multiplier_')).map((setting) => {
                   const descriptions: Record<string, string> = {
                     material_multiplier_Y: 'Y — Material multiplier. Applied to raw material cost (e.g. 2.0 = 2× the material cost).',
                     run_time_multiplier_W: 'W — Run time multiplier in $/hour. Charged per hour of machine print time (e.g. 1.25 = $1.25/hr).',
