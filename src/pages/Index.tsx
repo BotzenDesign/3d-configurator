@@ -11,6 +11,7 @@ import { parse3MF } from "@/lib/threemfParser";
 import { validate3DFile } from "@/utils/fileValidation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
+import { useCart } from "@/context/CartContext";
 
 // Preset model STL URLs (served from /public/models/)
 const PRESET_MODELS: Record<string, string> = {
@@ -38,6 +39,13 @@ export default function Index() {
   const [mobileTab, setMobileTab] = useState<"viewer" | "config">("viewer");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
+  const { registerUploadTrigger } = useCart();
+
+  useEffect(() => {
+    registerUploadTrigger(() => {
+      fileInputRef.current?.click();
+    });
+  }, [registerUploadTrigger]);
 
   const handleFileUpload = useCallback((file: File) => {
     const reader = new FileReader();

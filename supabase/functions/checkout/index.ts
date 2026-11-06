@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { title, price, quantity, properties, weight_in_grams } = body;
+    const { items, title, price, quantity, properties, weight_in_grams } = body;
 
     const shopDomain = Deno.env.get("VITE_SHOPIFY_DOMAIN");
     if (!shopDomain) {
@@ -24,29 +24,54 @@ Deno.serve(async (req) => {
       throw new Error("Server misconfiguration: Shopify Admin API token is missing.");
     }
 
-    // Convert properties { key: value } to Shopify Draft Order Array [{name, value}]
-    const customProperties = properties
-      ? Object.entries(properties).map(([name, value]) => ({
-          name,
-          value: String(value),
-        }))
-      : [];
+    let lineItems: any[] = [];
+
+    if (Array.isArray(items) && items.length > 0) {
+      lineItems = items.map((item: any) => {
+        const itemProps = item.properties
+          ? Object.entries(item.properties).map(([name, value]) => ({
+              name,
+              value: String(value),
+            }))
+          : [];
+
+        return {
+          title: item.title || "Custom 3D Print",
+          price: (Number(item.price) / 100).toFixed(2),
+          quantity: Number(item.quantity) || 1,
+          grams: item.weight_in_grams ? Math.round(Number(item.weight_in_grams)) : 0,
+          properties: itemProps,
+          requires_shipping: true,
+          taxable: true,
+        };
+      });
+    } else {
+      // Convert properties { key: value } to Shopify Draft Order Array [{name, value}]
+      const customProperties = properties
+        ? Object.entries(properties).map(([name, value]) => ({
+            name,
+            value: String(value),
+          }))
+        : [];
+
+      lineItems = [
+        {
+          title: title || "Custom 3D Print",
+          price: (Number(price) / 100).toFixed(2),
+          quantity: Number(quantity) || 1,
+          grams: weight_in_grams ? Math.round(Number(weight_in_grams)) : 0,
+          properties: customProperties,
+          requires_shipping: true,
+          taxable: true,
+        },
+      ];
+    }
 
     const draftOrderPayload = {
       draft_order: {
-        line_items: [
-          {
-            title: title || "Custom 3D Print",
-            price: (price / 100).toFixed(2), // Price comes in as cents
-            quantity: quantity || 1,
-            grams: weight_in_grams ? Math.round(weight_in_grams) : 0,
-            properties: customProperties,
-            requires_shipping: true,
-            taxable: true,
-          },
-        ],
+        line_items: lineItems,
         tags: "3D Print Quote",
-        note: "Created via Polar 3D Configurator",
+        note: `Created via Polar 3D Configurator (${lineItems.length} custom parts)`,
       },
     };
 

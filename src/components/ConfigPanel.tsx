@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { Minus, Plus, Loader2, AlertCircle, ShoppingCart, Mail } from "lucide-react";
+import { Minus, Plus, Loader2, AlertCircle, ShoppingCart, Mail, Layers } from "lucide-react";
 import { createCheckout } from "@/lib/shopifyClient";
 import { useQuote } from "@/hooks/useQuote";
 import PriceBreakdown from "./PriceBreakdown";
 import FileUploadComponent from "./FileUploadComponent";
 import ErrorBoundary from "./ErrorBoundary";
 import { supabase } from "@/integrations/supabase/client";
+import { useCart } from "@/context/CartContext";
 
 // ── Print Type ────────────────────────────────────────────────────────────────
 type PrintType = "FDM" | "SLA";
@@ -64,6 +65,8 @@ export default function ConfigPanel({
   uploadedFile: externalFile = null,
   isOversized,
 }: ConfigPanelProps) {
+  const { addItem, setIsOpen, items } = useCart();
+
   // Print type toggle
   const [printType, setPrintType] = useState<PrintType>("FDM");
 
@@ -214,6 +217,7 @@ export default function ConfigPanel({
     }
 
     setIsAddingToCart(true);
+    setCartError(null);
     try {
       let fileUrl = "";
       if (activeFile) {
@@ -241,32 +245,35 @@ export default function ConfigPanel({
         fileUrl = publicUrlData.publicUrl;
       }
 
-      const result = await createCheckout({
+      const unitPriceCents = Math.round((quote?.perUnitUsd ?? 0) * 100);
+      const weightInGrams = parseFloat(quote?.display.weight ?? modelStats.weight) || 0;
+
+      const added = addItem({
         title: `Custom 3D Print - ${modelName}`,
+        fileName: modelName,
+        fileUrl,
+        printType,
+        materialName: currentMaterial?.label || "Unknown",
+        color: availableColors[colorIdx] || "Unknown",
+        infill: `${effectiveInfill}%`,
+        dimensions: modelStats.dimensions,
+        weightDisplay: quote?.display.weight ?? modelStats.weight,
+        weightInGrams,
+        printTime: quote?.display.printTime ?? "N/A",
+        volume: modelStats.volume,
+        printability: quote ? `${quote.printabilityGrade}` : "N/A",
+        customNote: customNote.trim(),
+        isOversized,
         quantity,
-        price: Math.round((quote?.perUnitUsd ?? 0) * 100),
-        weight_in_grams: parseFloat(quote?.display.weight ?? modelStats.weight) || 0,
-        properties: {
-          "Print Type":  printType,
-          Material:      currentMaterial?.label || "Unknown",
-          Color:         availableColors[colorIdx] || "Unknown",
-          Infill:        `${effectiveInfill}%`,
-          Dimensions:    modelStats.dimensions,
-          Weight:        quote?.display.weight    ?? modelStats.weight,
-          "Print Time":  quote?.display.printTime ?? "N/A",
-          Volume:        modelStats.volume,
-          Printability:  quote ? `${quote.printabilityGrade}` : "N/A",
-          ...(customNote.trim() ? { "Order Note": customNote.trim() } : {}),
-          ...(isOversized ? { "Oversized Part": "Yes - Requires Manual Review" } : {}),
-          _file_name:    modelName,
-          ...(fileUrl ? { "File Download Link": fileUrl } : {}),
-        },
+        pricePerUnitCents: unitPriceCents,
+        totalPriceCents: unitPriceCents * quantity,
       });
-      if (result.success && result.checkoutUrl) {
-        window.location.href = result.checkoutUrl;
+
+      if (added) {
+        setCustomNote("");
       }
     } catch (err) {
-      setCartError(err instanceof Error ? err.message : "Failed to generate checkout link.");
+      setCartError(err instanceof Error ? err.message : "Failed to add part to queue.");
     } finally {
       setIsAddingToCart(false);
     }
@@ -468,26 +475,38 @@ export default function ConfigPanel({
         </p>
       </div>
 
-      {/* ── Checkout button ──────────────────────────────────────────────────── */}
-      <div className="p-4 pt-3">
+      {/* ── Add to Queue / Checkout button ────────────────────────────────────── */}
+      <div className="p-4 pt-3 space-y-2">
         <button
           id="shopify-add-to-cart-btn"
           onClick={handleAddToCart}
           disabled={isAddingToCart}
-          className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold text-sm
+          className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-bold text-sm
                      hover:opacity-90 transition-opacity flex items-center justify-center gap-2
-                     disabled:opacity-60 disabled:cursor-not-allowed"
+                     disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
         >
           {isAddingToCart ? (
-            <><Loader2 size={16} className="animate-spin" /> Generating Checkout...</>
+            <><Loader2 size={16} className="animate-spin" /> Adding to Queue...</>
           ) : isOversized ? (
             <><Mail size={16} /> Request Manual Review</>
           ) : customNote.trim() !== "" ? (
             <><Mail size={16} /> Request Custom Order</>
           ) : (
-            <><ShoppingCart size={16} /> Proceed to Checkout</>
+            <><ShoppingCart size={16} /> Add to Print Queue (+)</>
           )}
         </button>
+
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="w-full bg-secondary hover:bg-secondary/80 text-foreground py-2 rounded-lg font-semibold text-xs
+                       transition-colors flex items-center justify-center gap-2 border border-border"
+          >
+            <ShoppingCart size={14} className="text-primary" />
+            View Print Queue ({items.length} {items.length === 1 ? "part" : "parts"}) →
+          </button>
+        )}
       </div>
         {/* Summary */}
         {!isOversized && (

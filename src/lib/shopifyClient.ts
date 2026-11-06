@@ -22,12 +22,21 @@ export interface CheckoutLineItemProperties {
   [key: string]: string | undefined;
 }
 
-export interface CreateCheckoutInput {
+export interface CheckoutLineItemInput {
   title: string;
   quantity: number;
   price: number; // in cents
   weight_in_grams?: number;
-  properties: CheckoutLineItemProperties;
+  properties: Record<string, string>;
+}
+
+export interface CreateCheckoutInput {
+  title?: string;
+  quantity?: number;
+  price?: number; // in cents
+  weight_in_grams?: number;
+  properties?: CheckoutLineItemProperties;
+  items?: CheckoutLineItemInput[];
 }
 
 export interface CheckoutResponse {
@@ -43,20 +52,40 @@ export interface CheckoutResponse {
  */
 export async function createCheckout(input: CreateCheckoutInput): Promise<CheckoutResponse> {
 
-  // Clean properties — Shopify ignores properties with underscore prefix in
-  // standard cart UI, but we're using Draft Orders here so we can include it.
-  const cleanProperties: Record<string, string> = {};
-  for (const [key, value] of Object.entries(input.properties)) {
-    if (value !== undefined) cleanProperties[key] = value;
-  }
+  let payload: any;
 
-  const payload = {
-    title: input.title,
-    quantity: input.quantity,
-    price: input.price,
-    weight_in_grams: input.weight_in_grams,
-    properties: cleanProperties
-  };
+  if (input.items && input.items.length > 0) {
+    payload = {
+      items: input.items.map(item => {
+        const cleanProps: Record<string, string> = {};
+        for (const [key, value] of Object.entries(item.properties || {})) {
+          if (value !== undefined) cleanProps[key] = value;
+        }
+        return {
+          title: item.title,
+          quantity: item.quantity,
+          price: item.price,
+          weight_in_grams: item.weight_in_grams,
+          properties: cleanProps,
+        };
+      })
+    };
+  } else {
+    // Clean properties — Shopify ignores properties with underscore prefix in
+    // standard cart UI, but we're using Draft Orders here so we can include it.
+    const cleanProperties: Record<string, string> = {};
+    for (const [key, value] of Object.entries(input.properties || {})) {
+      if (value !== undefined) cleanProperties[key] = value;
+    }
+
+    payload = {
+      title: input.title,
+      quantity: input.quantity,
+      price: input.price,
+      weight_in_grams: input.weight_in_grams,
+      properties: cleanProperties
+    };
+  }
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
