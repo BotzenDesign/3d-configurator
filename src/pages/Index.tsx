@@ -39,13 +39,22 @@ export default function Index() {
   const [mobileTab, setMobileTab] = useState<"viewer" | "config">("viewer");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
-  const { registerUploadTrigger } = useCart();
+  const { registerUploadTrigger, registerOnStartEdit } = useCart();
 
   useEffect(() => {
     registerUploadTrigger(() => {
       fileInputRef.current?.click();
     });
   }, [registerUploadTrigger]);
+
+  useEffect(() => {
+    return registerOnStartEdit((item) => {
+      setModelName(item.fileName);
+      setColor(item.color);
+      setPrintType(item.printType);
+      if (isMobile) setMobileTab("config");
+    });
+  }, [registerOnStartEdit, isMobile]);
 
   const handleFileUpload = useCallback((file: File) => {
     const reader = new FileReader();

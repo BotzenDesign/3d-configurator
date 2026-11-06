@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { createCheckout } from "@/lib/shopifyClient";
 
@@ -39,6 +39,11 @@ interface CartContextType {
   checkoutCart: () => Promise<void>;
   registerUploadTrigger: (trigger: () => void) => void;
   triggerUpload: () => void;
+  editingItem: CartItem | null;
+  startEditing: (id: string) => void;
+  updateItem: (id: string, updated: Partial<CartItem>) => void;
+  cancelEditing: () => void;
+  registerOnStartEdit: (cb: (item: CartItem) => void) => () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -58,7 +63,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [isOpen, setIsOpen] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const uploadTriggerRef = React.useRef<(() => void) | null>(null);
+  const [editingItem, setEditingItem] = useState<CartItem | null>(null);
+  const uploadTriggerRef = useRef<(() => void) | null>(null);
+  const editCallbacksRef = useRef<Set<(item: CartItem) => void>>(new Set());
 
   // Sync with localStorage
   useEffect(() => {
@@ -102,6 +109,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
+    setEditingItem((prev) => (prev?.id === id ? null : prev));
     toast.info("Item removed from queue.");
   }, []);
 
@@ -121,6 +129,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearCart = useCallback(() => {
     setItems([]);
+    setEditingItem(null);
   }, []);
 
   const registerUploadTrigger = useCallback((trigger: () => void) => {
@@ -134,6 +143,41 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uploadTriggerRef.current?.();
       }, 200);
     }
+  }, []);
+
+  const registerOnStartEdit = useCallback((cb: (item: CartItem) => void) => {
+    editCallbacksRef.current.add(cb);
+    return () => {
+      editCallbacksRef.current.delete(cb);
+    };
+  }, []);
+
+  const startEditing = useCallback((id: string) => {
+    const found = items.find((i) => i.id === id);
+    if (!found) return;
+    setEditingItem(found);
+    setIsOpen(false);
+    editCallbacksRef.current.forEach((cb) => cb(found));
+    toast.info(`Editing specs for "${found.fileName}"`);
+  }, [items]);
+
+  const updateItem = useCallback((id: string, updated: Partial<CartItem>) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const merged = { ...item, ...updated };
+        merged.totalPriceCents = (merged.pricePerUnitCents || item.pricePerUnitCents) * (merged.quantity || item.quantity);
+        return merged;
+      })
+    );
+    setEditingItem(null);
+    toast.success(`Updated "${updated.fileName || 'part'}" in your print queue!`);
+    setIsOpen(true);
+  }, []);
+
+  const cancelEditing = useCallback(() => {
+    setEditingItem(null);
+    setIsOpen(true);
   }, []);
 
   const checkoutCart = useCallback(async () => {
@@ -211,6 +255,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         checkoutCart,
         registerUploadTrigger,
         triggerUpload,
+        editingItem,
+        startEditing,
+        updateItem,
+        cancelEditing,
+        registerOnStartEdit,
       }}
     >
       {children}

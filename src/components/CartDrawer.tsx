@@ -20,6 +20,7 @@ import {
   Layers,
   Scale,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 
 export default function CartDrawer() {
@@ -35,6 +36,7 @@ export default function CartDrawer() {
     isCheckingOut,
     checkoutCart,
     triggerUpload,
+    startEditing,
   } = useCart();
 
   const formattedTotal = (totalPriceCents / 100).toFixed(2);
@@ -117,15 +119,26 @@ export default function CartDrawer() {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeItem(item.id)}
-                    className="w-7 h-7 text-muted-foreground hover:text-destructive shrink-0"
-                    title="Remove part"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => startEditing(item.id)}
+                      className="w-7 h-7 text-muted-foreground hover:text-primary shrink-0"
+                      title="Edit part specs"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeItem(item.id)}
+                      className="w-7 h-7 text-muted-foreground hover:text-destructive shrink-0"
+                      title="Remove part"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Badges */}

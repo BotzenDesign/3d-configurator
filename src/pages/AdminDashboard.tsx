@@ -336,16 +336,19 @@ export default function AdminDashboard() {
                 <div>• <code>2.00</code> = Doubles the calculated price (100% extra)</div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {INFILL_CONFIG_KEYS.map((item) => {
+              <div className="space-y-3 max-w-2xl">
+                {INFILL_CONFIG_KEYS.slice().sort((a, b) => a.percentage - b.percentage).map((item, index) => {
                   const rawVal = getSettingValue(item.key, item.defaultVal);
                   const numVal = parseFloat(rawVal) || 1.0;
                   const markupPercent = Math.round((numVal - 1.0) * 100);
 
                   return (
-                    <div key={item.key} className="bg-background/80 p-4 rounded-xl border border-border flex flex-col justify-between space-y-3">
+                    <div key={item.key} className="bg-background/80 p-4 rounded-xl border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm hover:border-primary/40 transition-colors">
                       <div className="space-y-1">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-muted-foreground w-4">
+                            {index + 1}.
+                          </span>
                           <span className="font-semibold text-foreground text-sm flex items-center gap-2">
                             <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
                               {item.percentage}%
@@ -362,11 +365,11 @@ export default function AdminDashboard() {
                             {markupPercent === 0 ? 'Base Price (No Markup)' : markupPercent > 0 ? `+${markupPercent}% Markup` : `${markupPercent}% Discount`}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground">{item.desc}</p>
+                        <p className="text-xs text-muted-foreground pl-6">{item.desc}</p>
                       </div>
 
-                      <div className="flex items-center gap-2 pt-1">
-                        <div className="relative flex-1">
+                      <div className="flex items-center gap-2 sm:shrink-0 pl-6 sm:pl-0">
+                        <div className="relative w-28">
                           <Input
                             type="number"
                             step="0.05"

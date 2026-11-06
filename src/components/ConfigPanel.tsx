@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Minus, Plus, Loader2, AlertCircle, ShoppingCart, Mail, Layers } from "lucide-react";
+import { Minus, Plus, Loader2, AlertCircle, ShoppingCart, Mail, Layers, Pencil, Check } from "lucide-react";
 import { createCheckout } from "@/lib/shopifyClient";
 import { useQuote } from "@/hooks/useQuote";
 import PriceBreakdown from "./PriceBreakdown";
@@ -65,7 +65,7 @@ export default function ConfigPanel({
   uploadedFile: externalFile = null,
   isOversized,
 }: ConfigPanelProps) {
-  const { addItem, setIsOpen, items } = useCart();
+  const { addItem, setIsOpen, items, editingItem, updateItem, cancelEditing } = useCart();
 
   // Print type toggle
   const [printType, setPrintType] = useState<PrintType>("FDM");
@@ -139,6 +139,48 @@ export default function ConfigPanel({
       onColorChange(hex);
     }
   }, [materials.length, materialIdx, colorIdx, availableColors]);
+
+  // Hydrate config panel when user edits an item from the queue
+  useEffect(() => {
+    if (!editingItem) return;
+
+    if (editingItem.printType && editingItem.printType !== printType) {
+      setPrintType(editingItem.printType);
+      if (onPrintTypeChange) onPrintTypeChange(editingItem.printType);
+    }
+
+    if (materials.length > 0) {
+      const foundMatIdx = materials.findIndex(
+        (m) => m.label.toLowerCase() === editingItem.materialName.toLowerCase() || m.id === editingItem.materialName
+      );
+      if (foundMatIdx >= 0) {
+        setMaterialIdx(foundMatIdx);
+      }
+    }
+
+    if (editingItem.color) {
+      const foundColorIdx = availableColors.findIndex(
+        (c) => c.toLowerCase() === editingItem.color.toLowerCase()
+      );
+      if (foundColorIdx >= 0) {
+        setColorIdx(foundColorIdx);
+      }
+      onColorChange(COLOR_HEX[editingItem.color] || editingItem.color);
+    }
+
+    const numericInfill = parseInt(editingItem.infill);
+    if (!isNaN(numericInfill)) {
+      const foundInfillIdx = INFILL_OPTIONS.findIndex((opt) => opt.value === numericInfill);
+      if (foundInfillIdx >= 0) {
+        setInfillIdx(foundInfillIdx);
+      }
+    }
+
+    if (editingItem.quantity) {
+      setQuantity(editingItem.quantity);
+    }
+    setCustomNote(editingItem.customNote || "");
+  }, [editingItem, materials.length]);
 
   // Infill value — SLA is always 100%
   const effectiveInfill = printType === "SLA" ? 100 : (INFILL_OPTIONS[infillIdx]?.value ?? 20);
@@ -248,6 +290,31 @@ export default function ConfigPanel({
       const unitPriceCents = Math.round((quote?.perUnitUsd ?? 0) * 100);
       const weightInGrams = parseFloat(quote?.display.weight ?? modelStats.weight) || 0;
 
+      if (editingItem) {
+        updateItem(editingItem.id, {
+          title: `Custom 3D Print - ${modelName}`,
+          fileName: modelName,
+          ...(fileUrl ? { fileUrl } : {}),
+          printType,
+          materialName: currentMaterial?.label || "Unknown",
+          color: availableColors[colorIdx] || "Unknown",
+          infill: `${effectiveInfill}%`,
+          dimensions: modelStats.dimensions,
+          weightDisplay: quote?.display.weight ?? modelStats.weight,
+          weightInGrams,
+          printTime: quote?.display.printTime ?? "N/A",
+          volume: modelStats.volume,
+          printability: quote ? `${quote.printabilityGrade}` : "N/A",
+          customNote: customNote.trim(),
+          isOversized,
+          quantity,
+          pricePerUnitCents: unitPriceCents,
+          totalPriceCents: unitPriceCents * quantity,
+        });
+        setCustomNote("");
+        return;
+      }
+
       const added = addItem({
         title: `Custom 3D Print - ${modelName}`,
         fileName: modelName,
@@ -281,6 +348,25 @@ export default function ConfigPanel({
 
   return (
     <div className="w-full md:w-[320px] md:min-w-[320px] h-full bg-panel-bg flex flex-col overflow-y-auto">
+
+      {/* ── Editing Queue Item Banner ────────────────────────────────────────── */}
+      {editingItem && (
+        <div className="bg-primary/10 border-b border-primary/20 px-4 py-2.5 flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2 min-w-0">
+            <Pencil size={14} className="text-primary shrink-0" />
+            <span className="text-xs font-bold text-foreground truncate">
+              Editing: {editingItem.fileName}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={cancelEditing}
+            className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 transition-colors shrink-0"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* ── Live Price ───────────────────────────────────────────────────────── */}
       <div className="p-5 text-center border-b border-border">
@@ -486,7 +572,9 @@ export default function ConfigPanel({
                      disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
         >
           {isAddingToCart ? (
-            <><Loader2 size={16} className="animate-spin" /> Adding to Queue...</>
+            <><Loader2 size={16} className="animate-spin" /> {editingItem ? "Saving Changes..." : "Adding to Queue..."}</>
+          ) : editingItem ? (
+            <><Check size={16} /> Save Changes to Queue</>
           ) : isOversized ? (
             <><Mail size={16} /> Request Manual Review</>
           ) : customNote.trim() !== "" ? (
